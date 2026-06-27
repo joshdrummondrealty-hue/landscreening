@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lot Yield Calculator — quick buildable-lot estimate</title>
+<meta name="description" content="A free back-of-envelope estimate of buildable lots after wetlands and infrastructure takedowns. For land buyers and developers." />
+
+<!-- Favicons -->
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+
+<!-- Social share preview (Open Graph + Twitter/X).
+     ONE EDIT BEFORE POSTING: find/replace  https://REPLACE-WITH-YOUR-URL
+     with your live address (e.g. https://your-site.netlify.app). Scrapers
+     need the full absolute URL for the preview image to show. -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Lot Yield Calculator" />
+<meta property="og:description" content="Estimate buildable lots after wetlands and infrastructure takedowns. Free." />
+<meta property="og:image" content="https://REPLACE-WITH-YOUR-URL/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:url" content="https://REPLACE-WITH-YOUR-URL/" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Lot Yield Calculator" />
+<meta name="twitter:description" content="Estimate buildable lots after wetlands and infrastructure takedowns. Free." />
+<meta name="twitter:image" content="https://REPLACE-WITH-YOUR-URL/og-image.png" />
+
+<!-- ============================================================
+     LOT YIELD CALCULATOR  (free preview tool)
+     Single file. No build step. No dependencies.
+     Deploy by dropping this folder on Netlify / Cloudflare Pages /
+     GitHub Pages. Rename the brand in the <header> below.
+     Email capture uses Netlify Forms (free) — works automatically
+     when hosted on Netlify; it's a harmless no-op elsewhere.
+     ============================================================ -->
+
+<style>
+  :root{
+    /* Color-blind-safe palette: blue / amber / teal stay distinct
+       under deuteranopia & protanopia, and every color is paired
+       with a text label so the chart never relies on hue alone. */
+    --paper:   #f6f4ef;
+    --card:    #ffffff;
+    --ink:     #1c1c1a;
+    --muted:   #6a6760;
+    --line:    #e3ddd2;
+    --blue:    #1d4ed8;   /* gross */
+    --amber:   #c2660a;   /* after wetlands */
+    --teal:    #0f766e;   /* net developable */
+    --accent:  #b4441f;   /* eyebrow / signature */
+    --focus:   #1d4ed8;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height:1.5;
+    padding:32px 20px 56px;
+  }
+  .wrap{ max-width:780px; margin:0 auto; }
+
+  /* ---- Header ---- */
+  header{ margin-bottom:26px; }
+  .brand{
+    font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+    font-weight:700; color:var(--muted); margin-bottom:14px;
+  }
+  .eyebrow{
+    font-size:11.5px; letter-spacing:.16em; text-transform:uppercase;
+    font-weight:700; color:var(--accent); margin-bottom:6px;
+  }
+  h1{
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight:700; font-size:30px; line-height:1.12;
+    margin:0 0 8px;
+  }
+  .sub{ color:var(--muted); font-size:14.5px; margin:0; max-width:54ch; }
+
+  /* ---- Card ---- */
+  .card{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:14px; padding:26px;
+    box-shadow:0 1px 2px rgba(0,0,0,.04), 0 10px 30px rgba(0,0,0,.03);
+  }
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:30px; }
+
+  /* ---- Inputs ---- */
+  .field{ margin-bottom:18px; }
+  .field:last-child{ margin-bottom:0; }
+  label{ display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+  .inputrow{ position:relative; }
+  input[type="number"]{
+    width:100%; font-size:16px; padding:11px 44px 11px 13px;
+    border:1px solid var(--line); border-radius:9px; background:#fff;
+    color:var(--ink); -moz-appearance:textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  input:focus-visible{ outline:none; border-color:var(--focus); box-shadow:0 0 0 3px rgba(29,78,216,.18); }
+  .suffix{
+    position:absolute; right:13px; top:50%; transform:translateY(-50%);
+    font-size:13px; color:var(--muted); pointer-events:none;
+  }
+  .hint{ font-size:11.5px; color:var(--muted); margin-top:5px; }
+
+  /* ---- Results ---- */
+  .results-title{
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    font-weight:700; color:var(--muted); margin:0 0 14px;
+  }
+  .tile{ margin-bottom:16px; }
+  .tile .num{ font-family:Georgia, serif; font-size:30px; font-weight:700; line-height:1; }
+  .tile .lab{ font-size:12.5px; color:var(--muted); margin-top:4px; }
+  .tile.headline .num{ color:var(--teal); font-size:42px; }
+
+  /* ---- Takedown bars ---- */
+  .bars{ margin-top:22px; padding-top:20px; border-top:1px solid var(--line); }
+  .bars-title{
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    font-weight:700; color:var(--muted); margin:0 0 14px;
+  }
+  .bar{ margin-bottom:13px; }
+  .bar-head{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px; }
+  .bar-head .name{ font-weight:600; }
+  .bar-head .val{ color:var(--muted); font-variant-numeric:tabular-nums; }
+  .track{ height:12px; background:#efeae0; border-radius:6px; overflow:hidden; }
+  .fill{ height:100%; border-radius:6px; transition:width .35s ease; }
+
+  /* ---- Disclaimer ---- */
+  .disclaimer{
+    margin-top:22px; font-size:12px; color:var(--muted);
+    border-top:1px solid var(--line); padding-top:16px;
+  }
+
+  /* ---- CTA footer ---- */
+  .cta{
+    margin-top:22px; background:#15140f; color:#f4efe4;
+    border-radius:14px; padding:24px 24px 22px;
+  }
+  .cta h2{ font-family:Georgia, serif; font-size:19px; margin:0 0 6px; color:#fff; }
+  .cta p{ font-size:13.5px; margin:0 0 16px; color:#c8c2b4; max-width:56ch; }
+  .cta form{ display:flex; gap:10px; flex-wrap:wrap; }
+  .cta input[type="email"]{
+    flex:1 1 220px; min-width:0; font-size:15px; padding:11px 13px;
+    border:1px solid #3a382f; border-radius:9px; background:#211f18; color:#f4efe4;
+  }
+  .cta input[type="email"]::placeholder{ color:#8a8475; }
+  .cta input[type="email"]:focus-visible{ outline:none; border-color:#c98a3a; box-shadow:0 0 0 3px rgba(201,138,58,.25); }
+  .cta button{
+    font-size:14px; font-weight:600; padding:11px 18px; border:none; cursor:pointer;
+    border-radius:9px; background:#c98a3a; color:#1a1813;
+  }
+  .cta button:hover{ background:#d89a48; }
+  .cta button:focus-visible{ outline:none; box-shadow:0 0 0 3px rgba(201,138,58,.4); }
+  .cta-note{ font-size:11.5px; color:#8a8475; margin:12px 0 0; }
+  .cta-done{ display:none; font-size:14px; color:#e9c089; margin:6px 0 0; font-weight:600; }
+
+  footer.fineprint{
+    text-align:center; font-size:11.5px; color:var(--muted); margin-top:26px;
+  }
+
+  /* ---- Responsive ---- */
+  @media (max-width:640px){
+    body{ padding:24px 16px 44px; }
+    h1{ font-size:25px; }
+    .card{ padding:20px; }
+    .grid{ grid-template-columns:1fr; gap:24px; }
+    .results{ border-top:1px solid var(--line); padding-top:22px; }
+    .tile.headline .num{ font-size:38px; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .fill{ transition:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <!-- Rename this to your company. -->
+      <div class="brand">Drummond Land Co.</div>
+      <div class="eyebrow">Land Screening</div>
+      <h1>Lot Yield Calculator</h1>
+      <p class="sub">A back-of-envelope estimate of buildable lots after wetlands and infrastructure takedowns. Change any input to update instantly.</p>
+    </header>
+
+    <div class="card">
+      <div class="grid">
+        <!-- INPUTS -->
+        <div class="inputs">
+          <div class="field">
+            <label for="gross">Gross acreage</label>
+            <div class="inputrow">
+              <input id="gross" type="number" inputmode="decimal" min="0" step="0.1" value="40" />
+              <span class="suffix">ac</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="wet">Wetlands / unbuildable</label>
+            <div class="inputrow">
+              <input id="wet" type="number" inputmode="decimal" min="0" max="100" step="1" value="15" />
+              <span class="suffix">%</span>
+            </div>
+            <p class="hint">Share lost to wetlands, easements, and floodway.</p>
+          </div>
+
+          <div class="field">
+            <label for="infra">Roads &amp; infrastructure</label>
+            <div class="inputrow">
+              <input id="infra" type="number" inputmode="decimal" min="0" max="100" step="1" value="25" />
+              <span class="suffix">%</span>
+            </div>
+            <p class="hint">Takedown for ROW, detention, and open space.</p>
+          </div>
+
+          <div class="field">
+            <label for="lot">Average lot size</label>
+            <div class="inputrow">
+              <input id="lot" type="number" inputmode="decimal" min="0" step="0.01" value="0.25" />
+              <span class="suffix">ac</span>
+            </div>
+            <p class="hint">0.25 ac ≈ a typical quarter-acre lot.</p>
+          </div>
+        </div>
+
+        <!-- RESULTS -->
+        <div class="results">
+          <p class="results-title">Estimated yield</p>
+
+          <div class="tile headline">
+            <div class="num" id="r-lots">0</div>
+            <div class="lab">buildable lots</div>
+          </div>
+
+          <div class="tile">
+            <div class="num" id="r-net">0</div>
+            <div class="lab">net developable acres</div>
+          </div>
+
+          <div class="tile">
+            <div class="num" id="r-dens">0</div>
+            <div class="lab">lots per gross acre</div>
+          </div>
+
+          <div class="bars" aria-hidden="false">
+            <p class="bars-title">Land takedown</p>
+            <div class="bar">
+              <div class="bar-head"><span class="name">Gross</span><span class="val" id="b-gross-v">0 ac</span></div>
+              <div class="track"><div class="fill" id="b-gross" style="background:var(--blue)"></div></div>
+            </div>
+            <div class="bar">
+              <div class="bar-head"><span class="name">After wetlands</span><span class="val" id="b-wet-v">0 ac</span></div>
+              <div class="track"><div class="fill" id="b-wet" style="background:var(--amber)"></div></div>
+            </div>
+            <div class="bar">
+              <div class="bar-head"><span class="name">Net developable</span><span class="val" id="b-net-v">0 ac</span></div>
+              <div class="track"><div class="fill" id="b-net" style="background:var(--teal)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="disclaimer">
+        Planning-level estimate only. Actual yield depends on engineered grading, drainage,
+        setbacks, zoning, and a real site plan. Use it to screen deals fast — not to plat them.
+      </p>
+    </div>
+
+    <!-- EMAIL CAPTURE (Netlify Forms — free on Netlify, no-op elsewhere) -->
+    <div class="cta">
+      <h2>Want the full version?</h2>
+      <p>This free tool is a preview. The full release wires in flood zones, wetlands data, and deal economics — raw land cost per lot and land as a share of finished-lot value. Join the early list.</p>
+      <form name="early-list" method="POST" data-netlify="true" netlify-honeypot="bot-field" id="cta-form">
+        <input type="hidden" name="form-name" value="early-list" />
+        <p style="display:none"><label>Don't fill this: <input name="bot-field" /></label></p>
+        <input type="email" name="email" placeholder="you@email.com" aria-label="Email address" required />
+        <button type="submit">Notify me</button>
+      </form>
+      <p class="cta-done" id="cta-done">Thanks — you're on the list.</p>
+      <p class="cta-note">No spam. One email when it's live.</p>
+    </div>
+
+    <footer class="fineprint">Free tool · estimates only · © <span id="yr"></span> Drummond Land Co.</footer>
+  </div>
+
+<script>
+  (function(){
+    "use strict";
+    var $ = function(id){ return document.getElementById(id); };
+    var gross = $("gross"), wet = $("wet"), infra = $("infra"), lot = $("lot");
+
+    function num(el){ var v = parseFloat(el.value); return isFinite(v) && v >= 0 ? v : 0; }
+    function clampPct(el){
+      var v = parseFloat(el.value);
+      if (isFinite(v)){
+        if (v < 0) el.value = 0;
+        else if (v > 100) el.value = 100;
+      }
+    }
+    function fmtAc(n){ return (Math.round(n * 100) / 100).toLocaleString(undefined, {maximumFractionDigits:2}) + " ac"; }
+    function fmtNum(n, d){ return n.toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d}); }
+
+    function calc(){
+      clampPct(wet); clampPct(infra);
+
+      var g  = num(gross);
+      var wp = Math.min(num(wet), 100) / 100;
+      var ip = Math.min(num(infra), 100) / 100;
+      var ls = num(lot);
+
+      var afterWet = g * (1 - wp);
+      var net      = afterWet * (1 - ip);
+      var lots     = ls > 0 ? Math.floor(net / ls) : 0;
+      var density  = g > 0 ? lots / g : 0;
+
+      $("r-lots").textContent = lots.toLocaleString();
+      $("r-net").textContent  = fmtNum(net, 1);
+      $("r-dens").textContent = fmtNum(density, 2);
+
+      var max = Math.max(g, 0.0001);
+      $("b-gross").style.width = "100%";
+      $("b-wet").style.width   = (afterWet / max * 100) + "%";
+      $("b-net").style.width   = (net / max * 100) + "%";
+      $("b-gross-v").textContent = fmtAc(g);
+      $("b-wet-v").textContent   = fmtAc(afterWet);
+      $("b-net-v").textContent   = fmtAc(net);
+    }
+
+    [gross, wet, infra, lot].forEach(function(el){
+      el.addEventListener("input", calc);
+    });
+    calc();
+
+    // Friendly inline confirmation for the email form (works on Netlify;
+    // graceful on other hosts where the POST simply won't persist).
+    var form = $("cta-form");
+    if (form){
+      form.addEventListener("submit", function(e){
+        var email = form.querySelector('input[type="email"]');
+        if (email && email.value){
+          // Let Netlify capture it, then show confirmation.
+          try {
+            var data = new FormData(form);
+            fetch("/", { method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"},
+              body: new URLSearchParams(data).toString() }).catch(function(){});
+          } catch(_){}
+          e.preventDefault();
+          form.style.display = "none";
+          $("cta-done").style.display = "block";
+        }
+      });
+    }
+
+    $("yr").textContent = new Date().getFullYear();
+  })();
+</script>
+</body>
+</html>
