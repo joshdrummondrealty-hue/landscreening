@@ -50,11 +50,30 @@ Open Graph and Twitter/X tags in `index.html` point at `https://landscreening.ne
 
 ---
 
+## Baldwin County Land Sourcing OS (internal)
+
+`baldwin/index.html` is an internal deal-sourcing page (served at `/baldwin/`), built from the July 2026 D.R. Horton buy-box meeting. It is intentionally **not linked** from the public calculator and carries a `noindex` meta tag.
+
+It includes:
+
+- The buy box: spot lots ($75K–$120K/lot, $2K–$7K assignment fees), road-frontage minis (~120 ft/lot on county roads, water + electric at street, septic OK), and small self-developed deals (5–40 ac, ≤25 lots)
+- Kill screens (Bay Minette school zone, trailer areas, wetlands, price benchmark $18–25K/ac)
+- A parcel pipeline tracker with automatic 0–100 Deal Score ranking, saved in `localStorage`, with CSV import/export
+- Spot-lot wholesale calculator (builder 25% margin check) and road-frontage yield calculator
+- Target-market map (Leaflet/OpenStreetMap, degrades to a table if the CDN is unreachable)
+- Baldwin County rules cheat sheet (subdivision exemptions, 120-ft driveway spacing, ADPH septic setbacks) with phone numbers to verify
+- Data-source links (county GIS, school zone locator, wetlands mapper, FEMA) and cold-call scripts
+
+Pipeline data never leaves the browser — export CSV to back it up.
+
+---
+
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `index.html` | The entire app |
+| `baldwin/index.html` | Baldwin County Land Sourcing OS (internal, unlinked) |
 | `favicon.svg` | Vector tab icon |
 | `favicon.ico` | Fallback tab icon |
 | `favicon-16.png`, `favicon-32.png`, `favicon-48.png` | PNG tab icons |

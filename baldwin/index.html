@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Baldwin County Land Sourcing OS — Drummond Land Co.</title>
+<meta name="description" content="Internal deal-sourcing operating system: spot lots and road-frontage parcels in Baldwin County, AL." />
+<!-- Internal tool: keep out of search engines. Not linked from the public site. -->
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+
+<!-- Leaflet (target-market map). Loads from CDN; the page degrades
+     gracefully to the market list if the CDN is unreachable. -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+
+<!-- ============================================================
+     BALDWIN COUNTY LAND SOURCING OS
+     Built from the 2026-07-07 meeting with JP (D.R. Horton,
+     Baldwin County land acquisition) + Josh's sourcing notes.
+     Single file, no build step, same design system as the
+     Lot Yield Calculator. Pipeline data lives in localStorage
+     (this browser only) with CSV import/export.
+     ============================================================ -->
+
+<style>
+  :root{
+    --paper:   #f6f4ef;
+    --card:    #ffffff;
+    --ink:     #1c1c1a;
+    --muted:   #6a6760;
+    --line:    #e3ddd2;
+    --blue:    #1d4ed8;
+    --amber:   #c2660a;
+    --teal:    #0f766e;
+    --accent:  #b4441f;
+    --focus:   #1d4ed8;
+    --good:    #0f766e;
+    --warn:    #c2660a;
+    --bad:     #b91c1c;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height:1.5; padding:32px 20px 56px;
+  }
+  .wrap{ max-width:1060px; margin:0 auto; }
+
+  /* ---- Header ---- */
+  header{ margin-bottom:22px; }
+  .brand{ font-size:11px; letter-spacing:.18em; text-transform:uppercase; font-weight:700; color:var(--muted); margin-bottom:14px; }
+  .eyebrow{ font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; font-weight:700; color:var(--accent); margin-bottom:6px; }
+  h1{ font-family:Georgia, "Times New Roman", serif; font-weight:700; font-size:30px; line-height:1.12; margin:0 0 8px; }
+  .sub{ color:var(--muted); font-size:14.5px; margin:0; max-width:72ch; }
+
+  /* ---- Nav ---- */
+  nav.toc{ display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 26px; }
+  nav.toc a{
+    font-size:12.5px; font-weight:600; text-decoration:none; color:var(--ink);
+    border:1px solid var(--line); background:var(--card); border-radius:999px; padding:7px 14px;
+  }
+  nav.toc a:hover{ border-color:var(--accent); color:var(--accent); }
+
+  /* ---- Cards & sections ---- */
+  section{ margin-bottom:30px; }
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px; padding:24px;
+    box-shadow:0 1px 2px rgba(0,0,0,.04), 0 10px 30px rgba(0,0,0,.03);
+  }
+  h2{ font-family:Georgia, serif; font-size:21px; margin:0 0 4px; }
+  .h2-sub{ color:var(--muted); font-size:13.5px; margin:0 0 16px; }
+  h3{ font-size:14px; margin:18px 0 8px; }
+  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  .cols3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+
+  /* ---- Buy-box tiles ---- */
+  .program{ border:1px solid var(--line); border-radius:12px; padding:18px; }
+  .program h3{ margin:0 0 4px; font-size:15.5px; }
+  .program .tag{ display:inline-block; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; font-weight:700; border-radius:5px; padding:3px 8px; margin-bottom:10px; }
+  .tag.spot{ background:#e8effc; color:var(--blue); }
+  .tag.front{ background:#e6f3f2; color:var(--teal); }
+  .tag.dev{ background:#f8ecdd; color:var(--amber); }
+  .program ul{ margin:8px 0 0; padding-left:18px; font-size:13.5px; }
+  .program li{ margin-bottom:6px; }
+  .num-callout{ font-family:Georgia, serif; font-weight:700; }
+
+  ul.checklist{ margin:8px 0 0; padding-left:18px; font-size:13.5px; }
+  ul.checklist li{ margin-bottom:7px; }
+  .kill{ color:var(--bad); font-weight:700; }
+  .ok{ color:var(--good); font-weight:700; }
+  .verify{ font-size:12px; color:var(--warn); font-weight:600; }
+
+  table.ref{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.ref th, table.ref td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.ref th{ font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  .tablewrap{ overflow-x:auto; }
+
+  a{ color:var(--blue); }
+
+  /* ---- Inputs ---- */
+  label{ display:block; font-size:12.5px; font-weight:600; margin-bottom:5px; }
+  .field{ margin-bottom:14px; }
+  .inputrow{ position:relative; }
+  input[type="number"], input[type="text"], input[type="tel"], input[type="date"], select, textarea{
+    width:100%; font-size:14.5px; padding:9px 12px;
+    border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--ink);
+    font-family:inherit;
+  }
+  input[type="number"]{ padding-right:44px; -moz-appearance:textfield; }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible{
+    outline:none; border-color:var(--focus); box-shadow:0 0 0 3px rgba(29,78,216,.18);
+  }
+  .suffix{ position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:12.5px; color:var(--muted); pointer-events:none; }
+  .hint{ font-size:11.5px; color:var(--muted); margin-top:4px; }
+
+  /* ---- Calculator results ---- */
+  .tile{ margin-bottom:14px; }
+  .tile .num{ font-family:Georgia, serif; font-size:26px; font-weight:700; line-height:1; }
+  .tile .lab{ font-size:12px; color:var(--muted); margin-top:3px; }
+  .tile.headline .num{ font-size:36px; color:var(--teal); }
+  .flagline{ font-size:13px; font-weight:700; margin-top:6px; }
+  .flagline.good{ color:var(--good); }
+  .flagline.warn{ color:var(--warn); }
+  .flagline.bad{ color:var(--bad); }
+
+  /* ---- Buttons ---- */
+  button, .btn{
+    font-size:13.5px; font-weight:600; padding:10px 16px; border:none; cursor:pointer;
+    border-radius:9px; background:#15140f; color:#f4efe4; font-family:inherit;
+  }
+  button:hover{ background:#2a2820; }
+  button.secondary{ background:transparent; color:var(--ink); border:1px solid var(--line); }
+  button.secondary:hover{ border-color:var(--accent); color:var(--accent); background:transparent; }
+  button.danger{ background:transparent; color:var(--bad); border:1px solid var(--line); }
+  button:focus-visible{ outline:none; box-shadow:0 0 0 3px rgba(29,78,216,.25); }
+  .btnrow{ display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+
+  /* ---- Pipeline table ---- */
+  .pipe-controls{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .pipe-controls select{ width:auto; }
+  .count-pill{ font-size:12px; color:var(--muted); }
+  table.pipe{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.pipe th, table.pipe td{ text-align:left; padding:8px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.pipe th{ font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); white-space:nowrap; }
+  table.pipe td.actions{ white-space:nowrap; }
+  table.pipe button{ padding:5px 9px; font-size:11.5px; }
+  .status-pill{ display:inline-block; font-size:10.5px; font-weight:700; border-radius:999px; padding:3px 9px; white-space:nowrap; }
+  .st-identified{ background:#eee9df; color:#57534a; }
+  .st-researched{ background:#e8effc; color:var(--blue); }
+  .st-contacted{ background:#fdf0dd; color:var(--amber); }
+  .st-negotiating{ background:#fbe7d8; color:var(--accent); }
+  .st-contract{ background:#e6f3f2; color:var(--teal); }
+  .st-assigned{ background:#0f766e; color:#fff; }
+  .st-closed{ background:#15140f; color:#f4efe4; }
+  .st-dead{ background:#f6e2e2; color:var(--bad); }
+  .score-badge{ display:inline-block; min-width:38px; text-align:center; font-weight:700; font-size:12.5px; border-radius:7px; padding:4px 7px; }
+  .sc-hot{ background:#e6f3f2; color:var(--good); }
+  .sc-warm{ background:#fdf0dd; color:var(--warn); }
+  .sc-cold{ background:#eee9df; color:var(--muted); }
+  .followup-due{ color:var(--bad); font-weight:700; }
+  .empty-note{ color:var(--muted); font-size:13.5px; padding:14px 4px; }
+
+  /* ---- Parcel form ---- */
+  .formgrid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:14px 16px; }
+  .formgrid .span2{ grid-column:span 2; }
+  .formgrid .span3{ grid-column:span 3; }
+  fieldset.checks{ border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin:0; }
+  fieldset.checks legend{ font-size:12.5px; font-weight:600; padding:0 4px; }
+  fieldset.checks label{ display:inline-flex; align-items:center; gap:6px; font-weight:500; margin:4px 14px 4px 0; font-size:13px; }
+  fieldset.checks input{ width:auto; }
+
+  /* ---- Map ---- */
+  #map{ height:440px; border-radius:12px; border:1px solid var(--line); background:#efeae0; }
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:12.5px; color:var(--muted); }
+  .dot{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; }
+
+  /* ---- Script block ---- */
+  .script{ background:#f9f7f2; border:1px dashed var(--line); border-radius:10px; padding:14px 16px; font-size:13.5px; }
+  .script p{ margin:0 0 10px; }
+  .script p:last-child{ margin:0; }
+
+  .footnote{ margin-top:18px; font-size:12px; color:var(--muted); border-top:1px solid var(--line); padding-top:14px; }
+  footer.fineprint{ text-align:center; font-size:11.5px; color:var(--muted); margin-top:26px; }
+
+  @media (max-width:860px){
+    .cols, .cols3, .formgrid{ grid-template-columns:1fr; }
+    .formgrid .span2, .formgrid .span3{ grid-column:span 1; }
+  }
+  @media (max-width:640px){
+    body{ padding:24px 14px 44px; }
+    h1{ font-size:25px; }
+    .card{ padding:18px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">Drummond Land Co.</div>
+    <div class="eyebrow">Internal · Baldwin County, Alabama</div>
+    <h1>Baldwin County Land Sourcing OS</h1>
+    <p class="sub">Find it, screen it, contract it, assign it. Built around the D.R. Horton spot-lot and
+    road-frontage buy box (JP meeting, July 7, 2026). Pipeline data saves in this browser only —
+    export CSV to back it up.</p>
+  </header>
+
+  <nav class="toc" aria-label="Sections">
+    <a href="#buybox">Buy Box</a>
+    <a href="#screens">Kill Screens</a>
+    <a href="#pipeline">Parcel Pipeline</a>
+    <a href="#calcs">Deal Calculators</a>
+    <a href="#map-sec">Target Map</a>
+    <a href="#rules">County Rules</a>
+    <a href="#sources">Data Sources</a>
+    <a href="#outreach">Owner Outreach</a>
+  </nav>
+
+  <!-- ================= BUY BOX ================= -->
+  <section id="buybox">
+    <div class="card">
+      <h2>The Buy Box</h2>
+      <p class="h2-sub">Three ways to get paid, in order of speed. Everything gets wholesaled or flipped to the builder — no infrastructure, no development risk.</p>
+      <div class="cols3">
+        <div class="program">
+          <span class="tag spot">Program 1 · Fastest</span>
+          <h3>Spot Lots (Scattered Lots)</h3>
+          <ul>
+            <li>Vacant single lots in <strong>existing subdivisions</strong> — utilities and roads already in.</li>
+            <li>Builder pays <span class="num-callout">$75K–$120K</span> per lot (Pines of Perdido range). Orange Beach / Gulf Shores commands more.</li>
+            <li>Contract the lot, <strong>assign the contract</strong> for a <span class="num-callout">$2K–$7K</span> fee. Simultaneous close, ~60 days.</li>
+            <li>Builder wants a <strong>25% margin</strong> — price off the <em>last</em> comp in the subdivision, not the highest ask ever.</li>
+            <li>Their goal: <strong>200/yr</strong>. They closed 45 in year one. The demand is there.</li>
+          </ul>
+        </div>
+        <div class="program">
+          <span class="tag front">Program 2 · The Niche</span>
+          <h3>Road-Frontage Minis</h3>
+          <ul>
+            <li><strong>5–25 lots</strong> cut along an <strong>existing county road</strong>. No new roads — survey, subdivide, close.</li>
+            <li>Rule of thumb: <span class="num-callout">~120 ft of frontage per lot</span> on county roads (driveway spacing). Bigger lots = no competition with 60-ft subdivision inventory. 3-acre lots are fine.</li>
+            <li>Want <strong>water + electric at the street</strong>. Septic and well are OK — "we'll get in the boonies with it."</li>
+            <li>Big rural parcel? Ask to buy <strong>just the frontage</strong>: "Can I buy 2,000 feet of your frontage?" Owner keeps the back land (and any commercial corner).</li>
+            <li>Killing the development cost — not the land cost — is what makes these pencil.</li>
+          </ul>
+        </div>
+        <div class="program">
+          <span class="tag dev">Program 3 · Own Account</span>
+          <h3>Small Developments</h3>
+          <ul>
+            <li><strong>5–40 acres</strong>, up to <span class="num-callout">~25 lots</span> — one-man-show size, run through the C-corp.</li>
+            <li>Small deals approve easier: 22 lots doesn't pull a crowd at Planning Commission; 300 lots pulls two towns.</li>
+            <li>Ten small deals beat one big one — spread footprint, spread absorption risk.</li>
+            <li>Bigger opportunity than 25 lots? Partner it or flip it entitled.</li>
+            <li>Entitlement package target: <strong>Phase 1 ESA + boundary/topo survey + plat</strong>. Nothing heavier.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= KILL SCREENS ================= -->
+  <section id="screens">
+    <div class="card">
+      <h2>Kill Screens — check these before you dial</h2>
+      <p class="h2-sub">Two minutes of screening saves a wasted week. The Deal Score in the pipeline runs off these.</p>
+      <div class="cols">
+        <div>
+          <ul class="checklist">
+            <li><span class="kill">Bay Minette school zone = dead.</span> Anywhere else in the county works — "I-10 all the way down, and up in Loxley." Check the Baldwin County school zone locator before anything else.</li>
+            <li><span class="kill">Trailer-heavy area = dead</span> — <em>except</em> beach markets (Orange Beach / Gulf Shores), where old trailers are teardowns waiting on a million-dollar house.</li>
+            <li><span class="kill">Wetlands / swamp:</span> if it looks wet on the wetlands mapper, it is. No geotech shortcuts — that's someone else's lawsuit.</li>
+            <li><span class="kill">Survey encroachments:</span> look for buildings, car storage, fences over the line. Adverse-possession claims kill closings.</li>
+          </ul>
+        </div>
+        <div>
+          <ul class="checklist">
+            <li><span class="ok">Price benchmark:</span> central-county acreage (Silverhill area) trades <strong>$18K–$25K/acre</strong>. Out-of-town money is paying $50K and not closing — let them burn the year, stay in touch, be there when the listing dies.</li>
+            <li><span class="ok">Utilities:</span> water + electric at the street is the target. Public sewer is gravy. No sewer? Confirm septic feasibility (soil test) before contract — see County Rules below.</li>
+            <li><span class="ok">Frontage math:</span> frontage ÷ 120 ft ≈ lot count on county road. 800+ ft of frontage with water = automatic call.</li>
+            <li><span class="ok">Relationship rule:</span> any lead the builder hands over goes <em>back</em> to the builder. Handshake is the whole business.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PIPELINE ================= -->
+  <section id="pipeline">
+    <div class="card">
+      <h2>Parcel Pipeline</h2>
+      <p class="h2-sub">Track every parcel from first sighting to assignment. Deal Score ranks the list automatically (0–100). Data lives in this browser — export CSV regularly.</p>
+
+      <div class="pipe-controls">
+        <button id="btn-new">+ Add parcel</button>
+        <select id="filter-status" aria-label="Filter by status">
+          <option value="">All statuses</option>
+          <option>Identified</option><option>Researched</option><option>Contacted</option>
+          <option>Negotiating</option><option>Under Contract</option><option>Assigned</option>
+          <option>Closed</option><option>Dead</option>
+        </select>
+        <select id="filter-type" aria-label="Filter by deal type">
+          <option value="">All deal types</option>
+          <option>Spot Lot</option><option>Road Frontage</option><option>Development</option>
+        </select>
+        <select id="sort-by" aria-label="Sort">
+          <option value="score">Sort: Deal Score</option>
+          <option value="followup">Sort: Next follow-up</option>
+          <option value="updated">Sort: Last updated</option>
+        </select>
+        <button class="secondary" id="btn-export">Export CSV</button>
+        <button class="secondary" id="btn-import">Import CSV</button>
+        <input type="file" id="csv-file" accept=".csv" style="display:none" />
+        <span class="count-pill" id="pipe-count"></span>
+      </div>
+
+      <!-- Add / edit form (hidden until needed) -->
+      <div id="parcel-form-wrap" style="display:none; border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:18px;">
+        <h3 style="margin-top:0" id="form-title">Add parcel</h3>
+        <div class="formgrid">
+          <div class="field"><label for="f-pin">Parcel PIN / ID</label><input id="f-pin" type="text" placeholder="05-46-03-..." /></div>
+          <div class="field"><label for="f-loc">Location / road</label><input id="f-loc" type="text" placeholder="County Rd 26, Lillian" /></div>
+          <div class="field"><label for="f-market">Market</label>
+            <select id="f-market">
+              <option>Lillian</option><option>Elberta</option><option>Silverhill</option>
+              <option>Robertsdale</option><option>Summerdale</option><option>Foley</option>
+              <option>Loxley</option><option>Fairhope / Point Clear</option><option>Daphne / Spanish Fort</option>
+              <option>Orange Beach</option><option>Gulf Shores</option><option>Other (in target)</option>
+              <option>Bay Minette zone (avoid)</option>
+            </select>
+          </div>
+          <div class="field"><label for="f-type">Deal type</label>
+            <select id="f-type"><option>Spot Lot</option><option>Road Frontage</option><option>Development</option></select>
+          </div>
+          <div class="field"><label for="f-acres">Acreage</label><div class="inputrow"><input id="f-acres" type="number" min="0" step="0.01" /><span class="suffix">ac</span></div></div>
+          <div class="field"><label for="f-frontage">Road frontage</label><div class="inputrow"><input id="f-frontage" type="number" min="0" step="1" /><span class="suffix">ft</span></div></div>
+          <div class="field"><label for="f-lots">Est. lots</label><input id="f-lots" type="number" min="0" step="1" /></div>
+          <div class="field"><label for="f-ask">Ask / est. price</label><div class="inputrow"><input id="f-ask" type="number" min="0" step="1000" /><span class="suffix">$</span></div></div>
+          <div class="field"><label for="f-offer">My offer / contract</label><div class="inputrow"><input id="f-offer" type="number" min="0" step="1000" /><span class="suffix">$</span></div></div>
+          <div class="field span2">
+            <fieldset class="checks"><legend>Site checks</legend>
+              <label><input type="checkbox" id="f-water" /> Water at street</label>
+              <label><input type="checkbox" id="f-electric" /> Electric at street</label>
+              <label><input type="checkbox" id="f-sewer" /> Public sewer</label>
+              <label><input type="checkbox" id="f-septic" /> Septic feasible</label>
+              <label><input type="checkbox" id="f-paved" /> Paved county road</label>
+              <label><input type="checkbox" id="f-wet" /> Wetlands risk ⚠</label>
+              <label><input type="checkbox" id="f-trailer" /> Trailer-heavy ⚠</label>
+            </fieldset>
+          </div>
+          <div class="field"><label for="f-status">Status</label>
+            <select id="f-status">
+              <option>Identified</option><option>Researched</option><option>Contacted</option>
+              <option>Negotiating</option><option>Under Contract</option><option>Assigned</option>
+              <option>Closed</option><option>Dead</option>
+            </select>
+          </div>
+          <div class="field"><label for="f-owner">Owner name</label><input id="f-owner" type="text" /></div>
+          <div class="field"><label for="f-phone">Owner phone</label><input id="f-phone" type="tel" placeholder="(251) ..." /></div>
+          <div class="field"><label for="f-mail">Owner mailing address</label><input id="f-mail" type="text" /></div>
+          <div class="field"><label for="f-followup">Next follow-up</label><input id="f-followup" type="date" /></div>
+          <div class="field span3"><label for="f-notes">Notes</label><textarea id="f-notes" rows="2" placeholder="Comps, conversation log, appraisal claims, who referred it..."></textarea></div>
+        </div>
+        <div class="btnrow">
+          <button id="btn-save">Save parcel</button>
+          <button class="secondary" id="btn-cancel">Cancel</button>
+        </div>
+      </div>
+
+      <div class="tablewrap">
+        <table class="pipe" id="pipe-table">
+          <thead>
+            <tr>
+              <th>Score</th><th>Parcel / location</th><th>Type</th><th>Market</th>
+              <th>Ac / Front</th><th>Lots</th><th>Owner</th><th>Status</th><th>Follow-up</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="pipe-body"></tbody>
+        </table>
+        <p class="empty-note" id="pipe-empty">No parcels yet. Hit “+ Add parcel” or import a CSV. First targets from the meeting:
+        Pines of Perdido vacant lots (Hwy 98, Lillian), Adelina Estates area (Silverhill), and the Diane Bray parcel follow-up.</p>
+      </div>
+
+      <p class="footnote">Deal Score: market fit, utilities, frontage-per-lot ≥120 ft, price vs. the $18–25K/ac benchmark,
+      owner phone found, paved road — minus wetlands, trailer area, and an automatic floor for Bay Minette zone.
+      It ranks the call list; it doesn't replace judgment.</p>
+    </div>
+  </section>
+
+  <!-- ================= CALCULATORS ================= -->
+  <section id="calcs">
+    <div class="cols">
+
+      <div class="card">
+        <h2>Spot-Lot Wholesale</h2>
+        <p class="h2-sub">Will the builder's 25% margin survive your assignment fee?</p>
+        <div class="field"><label for="c1-comp">Last comp / builder lot value</label>
+          <div class="inputrow"><input id="c1-comp" type="number" min="0" step="1000" value="95000" /><span class="suffix">$</span></div>
+          <p class="hint">Pull the last vacant-lot sale in the subdivision — not the highest ask.</p>
+        </div>
+        <div class="field"><label for="c1-offer">Your contract price with owner</label>
+          <div class="inputrow"><input id="c1-offer" type="number" min="0" step="1000" value="65000" /><span class="suffix">$</span></div>
+        </div>
+        <div class="field"><label for="c1-fee">Your assignment fee</label>
+          <div class="inputrow"><input id="c1-fee" type="number" min="0" step="500" value="4000" /><span class="suffix">$</span></div>
+          <p class="hint">$2K–$3K standard; up to $7K where they can't get in (Orange Beach / Gulf Shores).</p>
+        </div>
+        <div class="tile headline"><div class="num" id="c1-margin">—</div><div class="lab">builder margin at their all-in cost</div></div>
+        <div class="tile"><div class="num" id="c1-allin">—</div><div class="lab">builder all-in (contract + your fee)</div></div>
+        <div class="tile"><div class="num" id="c1-max">—</div><div class="lab">max all-in that still clears 25%</div></div>
+        <p class="flagline" id="c1-flag"></p>
+      </div>
+
+      <div class="card">
+        <h2>Road-Frontage Yield</h2>
+        <p class="h2-sub">Frontage in, lots out. No roads, no pipe — survey and plat only.</p>
+        <div class="cols" style="gap:14px">
+          <div>
+            <div class="field"><label for="c2-front">Total road frontage</label>
+              <div class="inputrow"><input id="c2-front" type="number" min="0" step="10" value="1300" /><span class="suffix">ft</span></div>
+            </div>
+            <div class="field"><label for="c2-width">Lot width</label>
+              <div class="inputrow"><input id="c2-width" type="number" min="1" step="5" value="120" /><span class="suffix">ft</span></div>
+              <p class="hint">~120 ft per lot on county roads (driveway spacing).</p>
+            </div>
+            <div class="field"><label for="c2-land">Land cost (your contract)</label>
+              <div class="inputrow"><input id="c2-land" type="number" min="0" step="5000" value="220000" /><span class="suffix">$</span></div>
+            </div>
+          </div>
+          <div>
+            <div class="field"><label for="c2-soft">Survey, title, entitlement costs</label>
+              <div class="inputrow"><input id="c2-soft" type="number" min="0" step="1000" value="25000" /><span class="suffix">$</span></div>
+              <p class="hint">Surveyor + plat + Phase 1 + closing. Often no engineer needed.</p>
+            </div>
+            <div class="field"><label for="c2-price">Sale price per lot</label>
+              <div class="inputrow"><input id="c2-price" type="number" min="0" step="1000" value="45000" /><span class="suffix">$</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="tile headline"><div class="num" id="c2-lots">—</div><div class="lab">road-front lots</div></div>
+        <div class="cols" style="gap:14px">
+          <div class="tile"><div class="num" id="c2-profit">—</div><div class="lab">gross profit</div></div>
+          <div class="tile"><div class="num" id="c2-marg">—</div><div class="lab">margin on revenue</div></div>
+        </div>
+        <p class="flagline" id="c2-flag"></p>
+        <p class="hint">Need a raw-acreage yield instead? Use the <a href="../">Lot Yield Calculator</a>.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= MAP ================= -->
+  <section id="map-sec">
+    <div class="card">
+      <h2>Target Market Map</h2>
+      <p class="h2-sub">Where to hunt and where not to. Pins are town centers — pull actual parcels in the county GIS viewer (links below).</p>
+      <div id="map" role="img" aria-label="Map of Baldwin County target markets"></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--teal)"></span>Core target (spot lots + frontage)</span>
+        <span><span class="dot" style="background:var(--amber)"></span>Premium (higher assignment fees)</span>
+        <span><span class="dot" style="background:var(--bad)"></span>Avoid (Bay Minette schools)</span>
+      </div>
+      <div id="market-list" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <!-- ================= COUNTY RULES ================= -->
+  <section id="rules">
+    <div class="card">
+      <h2>Baldwin County Rules Cheat Sheet</h2>
+      <p class="h2-sub">The regulatory facts that make or break a road-front subdivide. Verified July 2026 — always confirm current rules before contract.</p>
+
+      <div class="cols">
+        <div>
+          <h3>Subdivision regulations (current version adopted Jan 7, 2025)</h3>
+          <ul class="checklist">
+            <li><strong>Exempt divisions</strong> (no subdivision process): family division deeded to immediate family (parent, sibling, spouse, child); a <strong>one-time split into two parcels</strong> if the parcel has existed un-divided since Feb 1, 1984; splits where <strong>both resulting parcels are ≥35 acres</strong>; common-lot-line moves that create no new parcel.</li>
+            <li><strong>Driveway spacing on county roads: 120-ft intervals or greater</strong> — this is why road-front lots pencil at ~120 ft wide.</li>
+            <li>Everything else runs through Planning &amp; Zoning as a minor or major subdivision — plat, review, Planning Commission where required. Small lot counts move faster and quieter.</li>
+            <li>Zoning varies by planning district; some districts are unzoned. Verify district + zoning (e.g., R-2 already in place = submit a plat and go).</li>
+            <li class="verify">Confirm current lot-width and minor-plat thresholds per district: Baldwin County Planning &amp; Zoning, (251) 580-1655.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Septic / onsite sewage (ADPH Chapter 420-3-1)</h3>
+          <ul class="checklist">
+            <li><strong>Soil test first:</strong> a licensed soil professional's test goes to the county health department with the permit application. No perc, no deal — make offers contingent on it.</li>
+            <li><strong>Setbacks:</strong> disposal field ≥ <strong>100 ft from any private well</strong>, ≥ <strong>5 ft from property lines</strong> — plus a <strong>reserved replacement field area</strong> on the lot.</li>
+            <li><strong>Sewer mandate:</strong> lots under 1 acre with public sewer available must connect — septic isn't an option there.</li>
+            <li>Minimum lot size for septic is site-specific (soil, water supply, bedrooms). Rule of thumb: bigger road-front lots (1–3 ac) clear easily; sub-half-acre lots need public water and good soil.</li>
+            <li class="verify">Confirm per-site: Baldwin County Health Dept environmental office, (251) 947-3618 / (251) 937-6935.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Entitlement package for a frontage deal</h3>
+      <div class="tablewrap">
+      <table class="ref">
+        <tr><th>Item</th><th>Who</th><th>Why</th></tr>
+        <tr><td>Boundary + topo survey</td><td>Licensed surveyor</td><td>Confirms frontage, flags encroachments/adverse possession before they kill the closing.</td></tr>
+        <tr><td>Phase 1 ESA</td><td>Environmental consultant</td><td>Builder requirement; cheap insurance.</td></tr>
+        <tr><td>Wetlands check</td><td>USFWS mapper screen → delineation if flagged</td><td>The county's #1 deal killer. Screen is free.</td></tr>
+        <tr><td>Soil test (if no sewer)</td><td>Licensed soil professional</td><td>Septic feasibility per lot before you're hard on money.</td></tr>
+        <tr><td>Minor plat</td><td>Surveyor → Planning &amp; Zoning</td><td>The actual subdivide. Often no engineer needed on pure frontage lots.</td></tr>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DATA SOURCES ================= -->
+  <section id="sources">
+    <div class="card">
+      <h2>Data Sources &amp; Search Recipes</h2>
+      <p class="h2-sub">The GIS screen the builder asked for: “pull me all parcels with 800 feet of road frontage with water and sewer.”</p>
+
+      <div class="cols">
+        <div>
+          <h3>Primary sources</h3>
+          <ul class="checklist">
+            <li><a href="https://isv.kcsgis.com/al.baldwin_revenue/" target="_blank" rel="noopener">Baldwin County parcel viewer (KCS GIS)</a> — ownership, PINs, mailing addresses, acreage. The workhorse.</li>
+            <li><a href="https://baldwincountyal.gov/departments/planning-zoning/subdivision-regulations" target="_blank" rel="noopener">Planning &amp; Zoning — subdivision regulations</a> and <a href="https://baldwincountyal.gov/departments/planning-zoning" target="_blank" rel="noopener">department page</a> (agendas, rezonings, permit forms).</li>
+            <li><a href="https://www.bcbe.org/" target="_blank" rel="noopener">Baldwin County Board of Education</a> — search “school zone locator.” Screen every parcel; Bay Minette zone is out.</li>
+            <li><a href="https://www.alabamapublichealth.gov/baldwin/sewage.html" target="_blank" rel="noopener">ADPH Baldwin — onsite sewage</a> — septic permitting process and contacts.</li>
+            <li><a href="https://www.fws.gov/program/national-wetlands-inventory/wetlands-mapper" target="_blank" rel="noopener">USFWS Wetlands Mapper</a> — free first-pass wetlands screen.</li>
+            <li><a href="https://msc.fema.gov/portal/home" target="_blank" rel="noopener">FEMA flood map center</a> — flood zone before you fall in love.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Field + owner tools</h3>
+          <ul class="checklist">
+            <li><strong>LandGlide</strong> — in-truck parcel lookup while driving frontage.</li>
+            <li><strong>Metro Market Trends</strong> — comps for spot-lot pricing (what the last lot actually sold for).</li>
+            <li><strong>Skip trace:</strong> GIS mailing address first, then TruePeopleSearch / FastPeopleSearch, then probate records for heirs. Can't find them? Knock on the door.</li>
+            <li><strong>Permit / agenda tracking:</strong> your existing tracker + PermitStack feeds; watch Planning Commission agendas for rezonings that signal sellers and absorption.</li>
+          </ul>
+          <h3>Search recipes</h3>
+          <ul class="checklist">
+            <li><strong>Frontage hunt:</strong> in GIS, trace target county roads (south of I-10 + Loxley), flag parcels with ≥800 ft frontage, cross-check water provider service maps, then screen wetlands + school zone. Everything that survives goes in the pipeline above.</li>
+            <li><strong>Spot-lot hunt:</strong> pick an older subdivision (Pines of Perdido pattern), list every vacant lot from GIS, pull owner mailing addresses, and call down the list. Tie up every one that comps.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= OUTREACH ================= -->
+  <section id="outreach">
+    <div class="card">
+      <h2>Owner Outreach</h2>
+      <p class="h2-sub">Call first. Mail second. Knock when they won't answer. Six-month follow-ups win the deal two years later.</p>
+
+      <div class="cols">
+        <div>
+          <h3>Cold-call opener (frontage)</h3>
+          <div class="script">
+            <p>“Hey [name], this is Josh Drummond — I'm a local land buyer here in Baldwin County, not a big out-of-town outfit. I was out on [road] and noticed your place. I'm not asking to buy the whole property — would you ever consider selling just some of the road frontage along [road]? You'd keep the back land and everything behind it.”</p>
+            <p>If interested: “I buy with a straightforward contract, I pay for the survey, and I close with a local title company. What would make it worth your while?”</p>
+          </div>
+          <h3>Cold-call opener (spot lot)</h3>
+          <div class="script">
+            <p>“I buy vacant lots in [subdivision] — I saw you've owned yours since [year]. Most folks are paying taxes on a lot they'll never build on. I can close in about 60 days, cash, no commissions. The last lot in there sold for [comp] — I can be right around that.”</p>
+          </div>
+        </div>
+        <div>
+          <h3>Working rules</h3>
+          <ul class="checklist">
+            <li><strong>Handshake rule:</strong> anything sourced from a builder lead goes back to that builder. Full stop.</li>
+            <li><strong>Contracts:</strong> use the builder's spot-lot assignment contract; assignment fee paid at closing, simultaneous close ~60 days.</li>
+            <li><strong>Overpriced owner?</strong> Don't chase. Note the ask, set a 60–90 day follow-up, be the call they make when the $50K/acre buyer evaporates.</li>
+            <li><strong>Log every touch</strong> in the pipeline notes with a date — the six-month drip is the system.</li>
+          </ul>
+          <h3>Key contacts</h3>
+          <div class="tablewrap">
+          <table class="ref">
+            <tr><th>Who</th><th>Role</th><th>Contact</th></tr>
+            <tr><td>JP</td><td>D.R. Horton — Baldwin land acq. (frontage + dev deals)</td><td><em>add number</em></td></tr>
+            <tr><td>Annabeth</td><td>D.R. Horton — spot-lot acquisitions (intro coming from JP)</td><td><em>add on intro</em></td></tr>
+            <tr><td>Planning &amp; Zoning</td><td>Subdivision / plat questions</td><td>(251) 580-1655</td></tr>
+            <tr><td>Health Dept (environmental)</td><td>Septic feasibility</td><td>(251) 947-3618</td></tr>
+          </table>
+          </div>
+        </div>
+      </div>
+
+      <h3>First moves (from the meeting)</h3>
+      <ul class="checklist">
+        <li>Wait on JP's email: Annabeth intro + the spot-lot assignment contract + sub-market hit list.</li>
+        <li>Drive <strong>Adelina Estates, Silverhill</strong> — the pattern deal for road-front lots. Hunt the next one nearby.</li>
+        <li>Pull every vacant lot in <strong>Pines of Perdido</strong> (Hwy 98, Lillian) from GIS and start the call-down. Builder wants them at $75K–$120K.</li>
+        <li>Keep the <strong>Diane Bray / Silverhill</strong> parcel on a 60-day follow-up — $30K/ac offer stands when the $49–52K ask dies.</li>
+        <li>Start the frontage trace on Lillian-area county roads — the builder's 1,300-ft-frontage deal is the template.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="fineprint">Internal tool · pipeline data stays in this browser · © <span id="yr"></span> Drummond Land Co.</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  $("yr").textContent = new Date().getFullYear();
+
+  function nnum(el){ var v = parseFloat(el.value); return isFinite(v) && v >= 0 ? v : 0; }
+  function money(n){ return "$" + Math.round(n).toLocaleString(); }
+  function pct(n){ return (Math.round(n * 10) / 10) + "%"; }
+
+  /* ---------- Calculator 1: spot-lot wholesale ---------- */
+  function calcSpot(){
+    var comp = nnum($("c1-comp")), offer = nnum($("c1-offer")), fee = nnum($("c1-fee"));
+    var allin = offer + fee;
+    var margin = comp > 0 ? (comp - allin) / comp * 100 : 0;
+    var maxAllin = comp * 0.75;
+    $("c1-allin").textContent = money(allin);
+    $("c1-margin").textContent = comp > 0 ? pct(margin) : "—";
+    $("c1-max").textContent = money(maxAllin);
+    var flag = $("c1-flag");
+    if (comp <= 0){ flag.textContent = ""; return; }
+    if (margin >= 25){ flag.className = "flagline good"; flag.textContent = "✓ Clears the builder's 25% target — send it."; }
+    else if (margin >= 18){ flag.className = "flagline warn"; flag.textContent = "Tight. Trim the offer or the fee to clear 25%."; }
+    else { flag.className = "flagline bad"; flag.textContent = "✗ Under water at their 25% target — renegotiate or pass."; }
+  }
+  ["c1-comp","c1-offer","c1-fee"].forEach(function(id){ $(id).addEventListener("input", calcSpot); });
+  calcSpot();
+
+  /* ---------- Calculator 2: road-frontage yield ---------- */
+  function calcFront(){
+    var front = nnum($("c2-front")), width = nnum($("c2-width")),
+        land = nnum($("c2-land")), soft = nnum($("c2-soft")), price = nnum($("c2-price"));
+    var lots = width > 0 ? Math.floor(front / width) : 0;
+    var revenue = lots * price;
+    var cost = land + soft;
+    var profit = revenue - cost;
+    var margin = revenue > 0 ? profit / revenue * 100 : 0;
+    $("c2-lots").textContent = lots.toLocaleString();
+    $("c2-profit").textContent = money(profit);
+    $("c2-marg").textContent = revenue > 0 ? pct(margin) : "—";
+    var flag = $("c2-flag");
+    if (revenue <= 0){ flag.textContent = ""; return; }
+    if (profit <= 0){ flag.className = "flagline bad"; flag.textContent = "✗ Loses money as structured."; }
+    else if (margin >= 30){ flag.className = "flagline good"; flag.textContent = "✓ Strong — " + money(profit) + " for a survey and a plat."; }
+    else { flag.className = "flagline warn"; flag.textContent = "Workable, but push the land price or lot price."; }
+  }
+  ["c2-front","c2-width","c2-land","c2-soft","c2-price"].forEach(function(id){ $(id).addEventListener("input", calcFront); });
+  calcFront();
+
+  /* ---------- Target market map ---------- */
+  var MARKETS = [
+    { name:"Lillian",           lat:30.393, lng:-87.437, kind:"core",    note:"Pensacola spillover; the 1,300-ft frontage deal pattern. Pines of Perdido spot lots on Hwy 98." },
+    { name:"Elberta",           lat:30.414, lng:-87.598, kind:"core",    note:"Frontage country between Foley and Lillian." },
+    { name:"Silverhill",        lat:30.544, lng:-87.750, kind:"core",    note:"Adelina Estates pattern deal. Acreage trades $18–25K; watch the Diane Bray parcel." },
+    { name:"Robertsdale",       lat:30.554, lng:-87.712, kind:"core",    note:"Central county; DRH wants ~20 spot lots here." },
+    { name:"Summerdale",        lat:30.488, lng:-87.700, kind:"core",    note:"Between Robertsdale and Foley; frontage + small subdivides." },
+    { name:"Foley",             lat:30.407, lng:-87.684, kind:"core",    note:"Growth engine; 700-lot Sommerdale/Foley deal country." },
+    { name:"Loxley",            lat:30.618, lng:-87.753, kind:"core",    note:"North edge of the target zone — still in bounds." },
+    { name:"Daphne / Spanish Fort", lat:30.64, lng:-87.91, kind:"core", note:"Eastern Shore infill; spot lots in older subdivisions." },
+    { name:"Orange Beach",      lat:30.294, lng:-87.574, kind:"premium", note:"Can't get deals here — spot lots earn premium assignment fees. Old trailers = teardowns." },
+    { name:"Gulf Shores",       lat:30.246, lng:-87.701, kind:"premium", note:"Same as Orange Beach — every vacant lot is a call." },
+    { name:"Bay Minette",       lat:30.883, lng:-87.773, kind:"avoid",   note:"School zone kill screen — builder won't buy in Bay Minette schools." }
+  ];
+  var KIND = { core:{color:"#0f766e", label:"Core target"}, premium:{color:"#c2660a", label:"Premium"}, avoid:{color:"#b91c1c", label:"Avoid"} };
+
+  function marketList(){
+    var html = "<div class='tablewrap'><table class='ref'><tr><th>Market</th><th>Class</th><th>Play</th></tr>";
+    MARKETS.forEach(function(m){
+      html += "<tr><td><strong>" + m.name + "</strong></td><td style='color:" + KIND[m.kind].color + ";font-weight:700'>" + KIND[m.kind].label + "</td><td>" + m.note + "</td></tr>";
+    });
+    $("market-list").innerHTML = html + "</table></div>";
+  }
+  marketList();
+
+  function initMap(){
+    if (typeof L === "undefined"){
+      $("map").innerHTML = "<p style='padding:18px;color:#6a6760;font-size:13.5px'>Map library unavailable — the market table below has the same intel.</p>";
+      return;
+    }
+    var map = L.map("map", { scrollWheelZoom:false }).setView([30.55, -87.72], 10);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18, attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+    MARKETS.forEach(function(m){
+      L.circleMarker([m.lat, m.lng], {
+        radius: 9, color: KIND[m.kind].color, fillColor: KIND[m.kind].color, fillOpacity: .75, weight: 2
+      }).addTo(map).bindPopup("<strong>" + m.name + "</strong><br>" + m.note);
+    });
+  }
+  if (document.readyState === "complete") initMap();
+  else window.addEventListener("load", initMap);
+
+  /* ---------- Parcel pipeline ---------- */
+  var STORE_KEY = "bcos-pipeline-v1";
+  var FIELDS = ["pin","loc","market","type","acres","frontage","lots","ask","offer",
+                "water","electric","sewer","septic","paved","wet","trailer",
+                "status","owner","phone","mail","followup","notes"];
+  var parcels = [];
+  var editingId = null;
+
+  function load(){
+    try { parcels = JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+    catch(_){ parcels = []; }
+  }
+  function persist(){ localStorage.setItem(STORE_KEY, JSON.stringify(parcels)); }
+
+  function score(p){
+    var s = 0;
+    if (p.market === "Bay Minette zone (avoid)") return 5;                 // hard floor
+    if (p.market === "Orange Beach" || p.market === "Gulf Shores") s += 20;
+    else s += 12;                                                          // any other target market
+    if (p.water) s += 10;
+    if (p.electric) s += 8;
+    if (p.sewer) s += 6; else if (p.septic) s += 5;
+    if (p.paved) s += 8;
+    var fr = parseFloat(p.frontage), lt = parseFloat(p.lots);
+    if (p.type === "Spot Lot") s += 12;                                    // fastest program
+    else if (fr > 0 && lt > 0 && fr / lt >= 120) s += 12;
+    else if (fr >= 800) s += 8;
+    var ac = parseFloat(p.acres), ask = parseFloat(p.ask);
+    if (ac > 0 && ask > 0 && p.type !== "Spot Lot"){
+      var perAc = ask / ac;
+      if (perAc <= 25000) s += 14;
+      else if (perAc <= 35000) s += 7;
+    } else if (p.type === "Spot Lot" && ask > 0){ s += 6; }
+    if (p.phone) s += 10;
+    if (p.wet) s -= 15;
+    if (p.trailer && p.market !== "Orange Beach" && p.market !== "Gulf Shores") s -= 12;
+    if (p.status === "Dead") s = Math.min(s, 10);
+    return Math.max(0, Math.min(100, Math.round(s)));
+  }
+
+  function statusClass(st){
+    return { "Identified":"st-identified","Researched":"st-researched","Contacted":"st-contacted",
+             "Negotiating":"st-negotiating","Under Contract":"st-contract","Assigned":"st-assigned",
+             "Closed":"st-closed","Dead":"st-dead" }[st] || "st-identified";
+  }
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function render(){
+    var fs = $("filter-status").value, ft = $("filter-type").value, sort = $("sort-by").value;
+    var rows = parcels.filter(function(p){
+      return (!fs || p.status === fs) && (!ft || p.type === ft);
+    });
+    rows.forEach(function(p){ p._score = score(p); });
+    rows.sort(function(a,b){
+      if (sort === "followup"){
+        return (a.followup || "9999") < (b.followup || "9999") ? -1 : 1;
+      }
+      if (sort === "updated") return (b.updated || 0) - (a.updated || 0);
+      return b._score - a._score;
+    });
+
+    var today = new Date().toISOString().slice(0,10);
+    var body = $("pipe-body"), html = "";
+    rows.forEach(function(p){
+      var sc = p._score;
+      var scClass = sc >= 70 ? "sc-hot" : sc >= 45 ? "sc-warm" : "sc-cold";
+      var fu = p.followup
+        ? "<span class='" + (p.followup <= today && p.status !== "Closed" && p.status !== "Dead" ? "followup-due" : "") + "'>" + esc(p.followup) + "</span>"
+        : "<span style='color:var(--muted)'>—</span>";
+      var acFront = (p.acres ? esc(p.acres) + " ac" : "—") + " / " + (p.frontage ? esc(p.frontage) + " ft" : "—");
+      var ownerCell = esc(p.owner || "—") + (p.phone ? "<br><a href='tel:" + esc(p.phone) + "'>" + esc(p.phone) + "</a>" : "");
+      html += "<tr>"
+        + "<td><span class='score-badge " + scClass + "'>" + sc + "</span></td>"
+        + "<td><strong>" + esc(p.pin || "—") + "</strong><br><span style='color:var(--muted)'>" + esc(p.loc || "") + "</span></td>"
+        + "<td>" + esc(p.type) + "</td>"
+        + "<td>" + esc(p.market) + "</td>"
+        + "<td style='white-space:nowrap'>" + acFront + "</td>"
+        + "<td>" + esc(p.lots || "—") + "</td>"
+        + "<td>" + ownerCell + "</td>"
+        + "<td><span class='status-pill " + statusClass(p.status) + "'>" + esc(p.status) + "</span></td>"
+        + "<td>" + fu + "</td>"
+        + "<td class='actions'><button class='secondary' data-edit='" + p.id + "'>Edit</button> "
+        + "<button class='danger' data-del='" + p.id + "'>✕</button></td>"
+        + "</tr>";
+    });
+    body.innerHTML = html;
+    $("pipe-empty").style.display = rows.length ? "none" : "block";
+    $("pipe-count").textContent = rows.length + " of " + parcels.length + " parcels";
+  }
+
+  function openForm(p){
+    editingId = p ? p.id : null;
+    $("form-title").textContent = p ? "Edit parcel" : "Add parcel";
+    FIELDS.forEach(function(f){
+      var el = $("f-" + f);
+      if (!el) return;
+      if (el.type === "checkbox") el.checked = p ? !!p[f] : false;
+      else el.value = p ? (p[f] || "") : (f === "market" ? "Lillian" : f === "type" ? "Spot Lot" : f === "status" ? "Identified" : "");
+    });
+    $("parcel-form-wrap").style.display = "block";
+    $("f-pin").focus();
+  }
+  function closeForm(){ $("parcel-form-wrap").style.display = "none"; editingId = null; }
+
+  $("btn-new").addEventListener("click", function(){ openForm(null); });
+  $("btn-cancel").addEventListener("click", closeForm);
+
+  $("btn-save").addEventListener("click", function(){
+    var p = editingId ? parcels.find(function(x){ return x.id === editingId; }) : { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6) };
+    FIELDS.forEach(function(f){
+      var el = $("f-" + f);
+      if (!el) return;
+      p[f] = el.type === "checkbox" ? el.checked : el.value.trim();
+    });
+    p.updated = Date.now();
+    if (!editingId) parcels.push(p);
+    persist(); closeForm(); render();
+  });
+
+  $("pipe-body").addEventListener("click", function(e){
+    var t = e.target;
+    if (t.dataset && t.dataset.edit){
+      var p = parcels.find(function(x){ return x.id === t.dataset.edit; });
+      if (p) openForm(p);
+    } else if (t.dataset && t.dataset.del){
+      var q = parcels.find(function(x){ return x.id === t.dataset.del; });
+      if (q && confirm("Delete parcel " + (q.pin || q.loc || "") + "?")){
+        parcels = parcels.filter(function(x){ return x.id !== q.id; });
+        persist(); render();
+      }
+    }
+  });
+
+  ["filter-status","filter-type","sort-by"].forEach(function(id){
+    $(id).addEventListener("change", render);
+  });
+
+  /* ---------- CSV export / import ---------- */
+  var CSV_COLS = ["id"].concat(FIELDS).concat(["updated"]);
+  function csvCell(v){
+    v = v == null ? "" : String(v);
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  $("btn-export").addEventListener("click", function(){
+    var lines = [CSV_COLS.join(",")];
+    parcels.forEach(function(p){
+      lines.push(CSV_COLS.map(function(c){ return csvCell(p[c]); }).join(","));
+    });
+    var blob = new Blob([lines.join("\n")], { type:"text/csv" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "baldwin-pipeline-" + new Date().toISOString().slice(0,10) + ".csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  function parseCSV(text){
+    var rows = [], row = [], cur = "", inQ = false;
+    for (var i = 0; i < text.length; i++){
+      var ch = text[i];
+      if (inQ){
+        if (ch === '"' && text[i+1] === '"'){ cur += '"'; i++; }
+        else if (ch === '"'){ inQ = false; }
+        else cur += ch;
+      } else if (ch === '"'){ inQ = true; }
+      else if (ch === ','){ row.push(cur); cur = ""; }
+      else if (ch === '\n' || ch === '\r'){
+        if (ch === '\r' && text[i+1] === '\n') i++;
+        row.push(cur); cur = "";
+        if (row.length > 1 || row[0] !== "") rows.push(row);
+        row = [];
+      } else cur += ch;
+    }
+    row.push(cur);
+    if (row.length > 1 || row[0] !== "") rows.push(row);
+    return rows;
+  }
+
+  $("btn-import").addEventListener("click", function(){ $("csv-file").click(); });
+  $("csv-file").addEventListener("change", function(){
+    var file = this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var rows = parseCSV(String(reader.result));
+      if (!rows.length){ alert("Empty CSV."); return; }
+      var header = rows[0];
+      var added = 0, updated = 0;
+      var boolFields = { water:1, electric:1, sewer:1, septic:1, paved:1, wet:1, trailer:1 };
+      rows.slice(1).forEach(function(r){
+        var obj = {};
+        header.forEach(function(h, i){ obj[h.trim()] = r[i] != null ? r[i] : ""; });
+        if (!obj.pin && !obj.loc && !obj.owner) return;
+        Object.keys(boolFields).forEach(function(b){ obj[b] = obj[b] === "true" || obj[b] === "TRUE" || obj[b] === "1"; });
+        obj.updated = parseInt(obj.updated, 10) || Date.now();
+        var existing = obj.id && parcels.find(function(x){ return x.id === obj.id; });
+        if (existing){ Object.assign(existing, obj); updated++; }
+        else { obj.id = obj.id || (Date.now().toString(36) + Math.random().toString(36).slice(2,6)); parcels.push(obj); added++; }
+      });
+      persist(); render();
+      alert("Imported: " + added + " new, " + updated + " updated.");
+    };
+    reader.readAsText(file);
+    this.value = "";
+  });
+
+  load();
+  render();
+})();
+</script>
+</body>
+</html>
