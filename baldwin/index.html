@@ -176,6 +176,13 @@
   fieldset.checks label{ display:inline-flex; align-items:center; gap:6px; font-weight:500; margin:4px 14px 4px 0; font-size:13px; }
   fieldset.checks input{ width:auto; }
 
+  /* ---- Finder ---- */
+  .finder-bar{ display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; }
+  .finder-bar .field{ flex:1 1 130px; margin-bottom:0; min-width:0; }
+  .finder-bar select{ max-width:100%; }
+  #src-status.err{ color:var(--bad); font-weight:600; }
+  #src-status.ok{ color:var(--good); font-weight:600; }
+
   /* ---- Map ---- */
   #map{ height:440px; border-radius:12px; border:1px solid var(--line); background:#efeae0; }
   .legend{ display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:12.5px; color:var(--muted); }
@@ -215,9 +222,9 @@
   <nav class="toc" aria-label="Sections">
     <a href="#buybox">Buy Box</a>
     <a href="#screens">Kill Screens</a>
+    <a href="#finder">Parcel Finder</a>
     <a href="#pipeline">Parcel Pipeline</a>
     <a href="#calcs">Deal Calculators</a>
-    <a href="#map-sec">Target Map</a>
     <a href="#rules">County Rules</a>
     <a href="#sources">Data Sources</a>
     <a href="#outreach">Owner Outreach</a>
@@ -245,7 +252,8 @@
           <h3>Road-Frontage Minis</h3>
           <ul>
             <li><strong>5–25 lots</strong> cut along an <strong>existing county road</strong>. No new roads — survey, subdivide, close.</li>
-            <li>Rule of thumb: <span class="num-callout">~120 ft of frontage per lot</span> on county roads (driveway spacing). Bigger lots = no competition with 60-ft subdivision inventory. 3-acre lots are fine.</li>
+            <li>Lot width of <span class="num-callout">~120 ft is measured at the front building line</span> (the setback), <em>not</em> at the pavement — so don't screen parcels out for having less at the road. Bigger lots = no competition with 60-ft subdivision inventory. 3-acre lots are fine.</li>
+            <li>Bread-and-butter find: <strong>1–2 acres with ~200 ft of road frontage</strong>. A wider tract can take a short cul-de-sac bulb off the road for a handful of lots — still no real infrastructure.</li>
             <li>Want <strong>water + electric at the street</strong>. Septic and well are OK — "we'll get in the boonies with it."</li>
             <li>Big rural parcel? Ask to buy <strong>just the frontage</strong>: "Can I buy 2,000 feet of your frontage?" Owner keeps the back land (and any commercial corner).</li>
             <li>Killing the development cost — not the land cost — is what makes these pencil.</li>
@@ -284,7 +292,7 @@
           <ul class="checklist">
             <li><span class="ok">Price benchmark:</span> central-county acreage (Silverhill area) trades <strong>$18K–$25K/acre</strong>. Out-of-town money is paying $50K and not closing — let them burn the year, stay in touch, be there when the listing dies.</li>
             <li><span class="ok">Utilities:</span> water + electric at the street is the target. Public sewer is gravy. No sewer? Confirm septic feasibility (soil test) before contract — see County Rules below.</li>
-            <li><span class="ok">Frontage math:</span> frontage ÷ 120 ft ≈ lot count on county road. 800+ ft of frontage with water = automatic call.</li>
+            <li><span class="ok">Frontage math:</span> lot width counts at the <em>front building line</em>, not the pavement — pie-shaped and cul-de-sac lots carry less at the road and still comply. 1–2 ac with ~200 ft of frontage is the bread-and-butter find; 800+ ft with water = automatic call.</li>
             <li><span class="ok">Relationship rule:</span> any lead the builder hands over goes <em>back</em> to the builder. Handshake is the whole business.</li>
           </ul>
         </div>
@@ -456,18 +464,90 @@
     </div>
   </section>
 
-  <!-- ================= MAP ================= -->
-  <section id="map-sec">
+  <!-- ================= PARCEL FINDER + MAP ================= -->
+  <section id="finder">
     <div class="card">
-      <h2>Target Market Map</h2>
-      <p class="h2-sub">Where to hunt and where not to. Pins are town centers — pull actual parcels in the county GIS viewer (links below).</p>
-      <div id="map" role="img" aria-label="Map of Baldwin County target markets"></div>
+      <h2>Parcel Finder</h2>
+      <p class="h2-sub">Live search of Baldwin County's public parcel layer (Revenue Commission / KCS GIS). Zoom the map to a hunting area,
+      set the filters, hit <strong>Search this view</strong> — it drops a pin on every matching parcel with the parcel number and owner,
+      and builds a call list you can push into the pipeline. No scraping, no paid data — this is the county's own public service.</p>
+
+      <div class="finder-bar">
+        <div class="field" style="flex:2 1 340px; margin:0">
+          <label for="src-url">Parcel service URL <span style="font-weight:400;color:var(--muted)">(county default — or paste any ArcGIS layer URL, e.g. from the county GIS Hub)</span></label>
+          <input id="src-url" type="text" value="https://al05baldrevenue.kcsgis.com/kcsgis/rest/services/Baldwin/Public/MapServer" />
+        </div>
+        <div class="field" style="flex:0 0 auto; margin:0">
+          <label>&nbsp;</label>
+          <button id="btn-connect">Connect</button>
+        </div>
+        <div class="field" id="layer-pick-wrap" style="flex:1 1 200px; margin:0; display:none">
+          <label for="layer-pick">Layer</label>
+          <select id="layer-pick"></select>
+        </div>
+      </div>
+      <p class="hint" id="src-status">Not connected yet. Hit Connect once — it reads the service and auto-detects the parcel fields.</p>
+
+      <div id="fieldmap" style="display:none; margin-top:10px">
+        <div class="finder-bar">
+          <div class="field"><label for="fm-pin">Parcel # field</label><select id="fm-pin"></select></div>
+          <div class="field"><label for="fm-owner">Owner field</label><select id="fm-owner"></select></div>
+          <div class="field"><label for="fm-mail">Owner mailing field</label><select id="fm-mail"></select></div>
+          <div class="field"><label for="fm-situs">Parcel address field</label><select id="fm-situs"></select></div>
+          <div class="field"><label for="fm-acres">Acres field</label><select id="fm-acres"></select></div>
+          <div class="field"><label for="fm-imp">Improvement $ field</label><select id="fm-imp"></select></div>
+        </div>
+      </div>
+
+      <div class="finder-bar" style="margin-top:12px">
+        <div class="field"><label for="q-min">Min acres</label><div class="inputrow"><input id="q-min" type="number" min="0" step="0.5" value="1" /><span class="suffix">ac</span></div></div>
+        <div class="field"><label for="q-max">Max acres</label><div class="inputrow"><input id="q-max" type="number" min="0" step="1" value="40" /><span class="suffix">ac</span></div></div>
+        <div class="field" style="align-self:end">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-weight:500;margin:0 0 10px">
+            <input type="checkbox" id="q-vacant" checked style="width:auto" /> Vacant only (no improvement value)
+          </label>
+        </div>
+        <div class="field" style="align-self:end"><button id="btn-search" disabled>Search this view</button></div>
+        <div class="field" style="align-self:end"><button class="secondary" id="btn-geojson">Load GeoJSON file</button>
+          <input type="file" id="geojson-file" accept=".geojson,.json" style="display:none" /></div>
+        <div class="field" style="align-self:end"><button class="secondary" id="btn-clear-results">Clear results</button></div>
+      </div>
+      <p class="hint">Tip: search one hunting area at a time (the query covers what's on screen, up to 800 parcels).
+      If the live search won't connect, download the parcels layer as GeoJSON from the
+      <a href="https://baldwin-county-gis-hub-baldwincounty.hub.arcgis.com/" target="_blank" rel="noopener">Baldwin County GIS Hub</a>
+      and use “Load GeoJSON file” — same result, works offline.</p>
+
+      <div id="map" role="application" aria-label="Map of Baldwin County target markets and parcel search results" style="margin-top:10px"></div>
       <div class="legend">
-        <span><span class="dot" style="background:var(--teal)"></span>Core target (spot lots + frontage)</span>
-        <span><span class="dot" style="background:var(--amber)"></span>Premium (higher assignment fees)</span>
+        <span><span class="dot" style="background:var(--blue)"></span>Parcel result (click for details)</span>
+        <span><span class="dot" style="background:var(--teal)"></span>Core target market</span>
+        <span><span class="dot" style="background:var(--amber)"></span>Premium market</span>
         <span><span class="dot" style="background:var(--bad)"></span>Avoid (Bay Minette schools)</span>
       </div>
-      <div id="market-list" style="margin-top:14px"></div>
+
+      <div id="results-wrap" style="display:none; margin-top:16px">
+        <h3 style="margin-top:0">Call list — <span id="results-count">0</span> parcels</h3>
+        <div class="btnrow" style="margin-bottom:10px">
+          <button id="btn-add-selected">Add selected to pipeline</button>
+          <button class="secondary" id="btn-export-calls">Export call-list CSV</button>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-weight:500;font-size:12.5px;margin:0">
+            <input type="checkbox" id="sel-all" style="width:auto" /> select all
+          </label>
+        </div>
+        <div class="tablewrap">
+          <table class="pipe" id="results-table">
+            <thead><tr><th></th><th>Parcel #</th><th>Owner</th><th>Mailing address</th><th>Acres</th><th>Impr. $</th><th>Map</th></tr></thead>
+            <tbody id="results-body"></tbody>
+          </table>
+        </div>
+        <p class="hint">Owner name and mailing address come straight off the county roll — skip-trace the phone from there
+        (TruePeopleSearch → FastPeopleSearch → door knock). “Add to pipeline” carries the parcel number, acres, owner, and mailing address over automatically.</p>
+      </div>
+
+      <details style="margin-top:16px">
+        <summary style="cursor:pointer; font-weight:600; font-size:13.5px">Target market notes (where to zoom first)</summary>
+        <div id="market-list" style="margin-top:10px"></div>
+      </details>
     </div>
   </section>
 
@@ -482,8 +562,9 @@
           <h3>Subdivision regulations (current version adopted Jan 7, 2025)</h3>
           <ul class="checklist">
             <li><strong>Exempt divisions</strong> (no subdivision process): family division deeded to immediate family (parent, sibling, spouse, child); a <strong>one-time split into two parcels</strong> if the parcel has existed un-divided since Feb 1, 1984; splits where <strong>both resulting parcels are ≥35 acres</strong>; common-lot-line moves that create no new parcel.</li>
-            <li><strong>Driveway spacing on county roads: 120-ft intervals or greater</strong> — this is why road-front lots pencil at ~120 ft wide.</li>
-            <li>Everything else runs through Planning &amp; Zoning as a minor or major subdivision — plat, review, Planning Commission where required. Small lot counts move faster and quieter.</li>
+            <li><strong>Lot width is measured at the minimum front setback line (the front building line), not at the road edge</strong> — that's the regs' own definition. A lot that's ~100 ft at the pavement and flares to 120 ft where the house sits complies. So never screen parcels out on road frontage alone.</li>
+            <li><strong>Driveway spacing on county roads: 120-ft intervals or greater</strong> (access management) — the practical driver behind wide road-front lots.</li>
+            <li><strong>Minor subdivision track</strong> (small plats move fast): the model in Baldwin's cities — e.g. Foley — is <strong>≤5 contiguous lots fronting an existing publicly maintained street, no new streets, no new water/sewer mains</strong>; the county's small-plat process is the same shape. That's exactly the frontage-deal profile: preliminary + final plat in one motion, no Planning Commission drama.</li>
             <li>Zoning varies by planning district; some districts are unzoned. Verify district + zoning (e.g., R-2 already in place = submit a plat and go).</li>
             <li class="verify">Confirm current lot-width and minor-plat thresholds per district: Baldwin County Planning &amp; Zoning, (251) 580-1655.</li>
           </ul>
@@ -494,7 +575,7 @@
             <li><strong>Soil test first:</strong> a licensed soil professional's test goes to the county health department with the permit application. No perc, no deal — make offers contingent on it.</li>
             <li><strong>Setbacks:</strong> disposal field ≥ <strong>100 ft from any private well</strong>, ≥ <strong>5 ft from property lines</strong> — plus a <strong>reserved replacement field area</strong> on the lot.</li>
             <li><strong>Sewer mandate:</strong> lots under 1 acre with public sewer available must connect — septic isn't an option there.</li>
-            <li>Minimum lot size for septic is site-specific (soil, water supply, bedrooms). Rule of thumb: bigger road-front lots (1–3 ac) clear easily; sub-half-acre lots need public water and good soil.</li>
+            <li><strong>Minimum acreage for septic: there is no fixed statewide number.</strong> ADPH sizes each lot from the soil test, the system footprint, and the mandatory 100% replacement field. Practical floors: on <strong>public water with decent soil, ~half-acre lots routinely clear</strong>; with a <strong>well and septic on the same lot, the 100-ft well-to-field radius effectively pushes you to ~1 acre+</strong>. The 1–2 ac road-front profile clears comfortably.</li>
             <li class="verify">Confirm per-site: Baldwin County Health Dept environmental office, (251) 947-3618 / (251) 937-6935.</li>
           </ul>
         </div>
@@ -542,8 +623,8 @@
           </ul>
           <h3>Search recipes</h3>
           <ul class="checklist">
-            <li><strong>Frontage hunt:</strong> in GIS, trace target county roads (south of I-10 + Loxley), flag parcels with ≥800 ft frontage, cross-check water provider service maps, then screen wetlands + school zone. Everything that survives goes in the pipeline above.</li>
-            <li><strong>Spot-lot hunt:</strong> pick an older subdivision (Pines of Perdido pattern), list every vacant lot from GIS, pull owner mailing addresses, and call down the list. Tie up every one that comps.</li>
+            <li><strong>Frontage hunt:</strong> in the <a href="#finder">Parcel Finder</a>, zoom to a target area (south of I-10 + Loxley), search 1–40 ac vacant, and eyeball the outlines for road frontage — 200 ft on a county road is in play. Cross-check water provider maps, wetlands, and school zone; survivors go to the pipeline.</li>
+            <li><strong>Spot-lot hunt:</strong> zoom the Finder into an older subdivision (Pines of Perdido pattern), search 0–1 ac vacant — that lists every vacant lot with owner and mailing address in one shot. Call down the list; tie up every one that comps.</li>
           </ul>
         </div>
       </div>
@@ -677,20 +758,22 @@
   }
   marketList();
 
+  var map = null, parcelLayer = null;
   function initMap(){
     if (typeof L === "undefined"){
-      $("map").innerHTML = "<p style='padding:18px;color:#6a6760;font-size:13.5px'>Map library unavailable — the market table below has the same intel.</p>";
+      $("map").innerHTML = "<p style='padding:18px;color:#6a6760;font-size:13.5px'>Map library unavailable — the market table below has the same intel. Live parcel search needs the map; check your connection.</p>";
       return;
     }
-    var map = L.map("map", { scrollWheelZoom:false }).setView([30.55, -87.72], 10);
+    map = L.map("map", { scrollWheelZoom:false }).setView([30.55, -87.72], 10);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18, attribution: "&copy; OpenStreetMap contributors"
+      maxZoom: 19, attribution: "&copy; OpenStreetMap contributors"
     }).addTo(map);
     MARKETS.forEach(function(m){
       L.circleMarker([m.lat, m.lng], {
         radius: 9, color: KIND[m.kind].color, fillColor: KIND[m.kind].color, fillOpacity: .75, weight: 2
       }).addTo(map).bindPopup("<strong>" + m.name + "</strong><br>" + m.note);
     });
+    parcelLayer = L.layerGroup().addTo(map);
   }
   if (document.readyState === "complete") initMap();
   else window.addEventListener("load", initMap);
@@ -720,8 +803,8 @@
     if (p.paved) s += 8;
     var fr = parseFloat(p.frontage), lt = parseFloat(p.lots);
     if (p.type === "Spot Lot") s += 12;                                    // fastest program
-    else if (fr > 0 && lt > 0 && fr / lt >= 120) s += 12;
-    else if (fr >= 800) s += 8;
+    else if (fr > 0 && lt > 0 && fr / lt >= 100) s += 12;                  // width counts at building line, not pavement
+    else if (fr >= 200) s += 8;                                            // the 1–2 ac / 200 ft bread-and-butter profile
     var ac = parseFloat(p.acres), ask = parseFloat(p.ask);
     if (ac > 0 && ask > 0 && p.type !== "Spot Lot"){
       var perAc = ask / ac;
@@ -908,6 +991,312 @@
 
   load();
   render();
+
+  /* ---------- Parcel Finder ---------- */
+  var FINDER = { layerUrl:null, fields:[], results:[] };
+
+  function setStatus(msg, cls){
+    var el = $("src-status");
+    el.textContent = msg;
+    el.className = "hint" + (cls ? " " + cls : "");
+  }
+
+  function guessField(names, regexes){
+    for (var r = 0; r < regexes.length; r++){
+      for (var i = 0; i < names.length; i++){
+        if (regexes[r].test(names[i])) return names[i];
+      }
+    }
+    return "";
+  }
+  var GUESS = {
+    pin:   [/^pin$|^ppin$/i, /^par(cel)?[_ ]?(no|num|id)/i, /parcel.*(no|num|id)/i, /^parcel$|^parid$/i],
+    owner: [/^owner[_ ]?name/i, /^owner1?$/i, /^own(er)?[_ ]?1$/i, /owner(?!.*(addr|mail|city|st|zip))/i],
+    mail:  [/(owner|own|mail).*(addr|street)/i, /^mail/i, /(addr).*?(1|line)?$/i],
+    situs: [/situs/i, /phys.*addr/i, /prop.*(addr|loc)/i, /site.*addr/i, /location/i],
+    acres: [/^(gis|calc|deed)?[_ ]?acre(age|s)?(_?(gis|calc))?$/i, /acre/i],
+    imp:   [/^imp(r|rv)?[_ ]?val/i, /(impr?|bldg|building).*(val|value)/i, /^improvement/i]
+  };
+
+  function populateFieldSelects(fields){
+    FINDER.fields = fields;
+    var names = fields.map(function(f){ return f.name; });
+    ["pin","owner","mail","situs","acres","imp"].forEach(function(k){
+      var sel = $("fm-" + k);
+      var guessed = guessField(names, GUESS[k]);
+      sel.innerHTML = "<option value=''>— none —</option>" + fields.map(function(f){
+        var label = f.alias && f.alias !== f.name ? f.name + " (" + f.alias + ")" : f.name;
+        return "<option value='" + esc(f.name) + "'" + (f.name === guessed ? " selected" : "") + ">" + esc(label) + "</option>";
+      }).join("");
+    });
+    $("fieldmap").style.display = "block";
+  }
+
+  function fetchJson(url){
+    return fetch(url).then(function(res){
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }).then(function(j){
+      if (j.error) throw new Error(j.error.message || "service error");
+      return j;
+    });
+  }
+
+  function connectLayer(layerUrl){
+    setStatus("Reading layer…");
+    return fetchJson(layerUrl + "?f=json").then(function(j){
+      if (!j.fields) throw new Error("No fields on this layer — pick a different layer.");
+      FINDER.layerUrl = layerUrl;
+      populateFieldSelects(j.fields);
+      $("btn-search").disabled = false;
+      setStatus("Connected: " + (j.name || layerUrl) + " — check the field mapping, zoom the map, then Search this view.", "ok");
+    });
+  }
+
+  $("btn-connect").addEventListener("click", function(){
+    var url = $("src-url").value.trim().replace(/\/+$/, "").split("?")[0];
+    if (!url){ setStatus("Paste a service URL first.", "err"); return; }
+    setStatus("Connecting…");
+    $("layer-pick-wrap").style.display = "none";
+    fetchJson(url + "?f=json").then(function(j){
+      if (j.fields){ return connectLayer(url); }               // already a layer URL
+      var layers = (j.layers || []).filter(function(l){ return !l.subLayerIds || !l.subLayerIds.length; });
+      if (!layers.length) throw new Error("No layers found on this service.");
+      var pick = $("layer-pick");
+      pick.innerHTML = layers.map(function(l){
+        return "<option value='" + l.id + "'>" + esc(l.name) + " (id " + l.id + ")</option>";
+      }).join("");
+      var parcelLike = layers.find(function(l){ return /parcel/i.test(l.name); });
+      if (parcelLike) pick.value = String(parcelLike.id);
+      $("layer-pick-wrap").style.display = "block";
+      pick.onchange = function(){ connectLayer(url + "/" + pick.value); };
+      return connectLayer(url + "/" + pick.value);
+    }).catch(function(e){
+      setStatus("Couldn't connect (" + e.message + "). The server may block cross-site requests — use the GeoJSON download from the county GIS Hub and “Load GeoJSON file” instead.", "err");
+    });
+  });
+
+  function esriRingsToGeoJSON(geom){
+    if (!geom || !geom.rings) return null;
+    return { type:"Polygon", coordinates: geom.rings };
+  }
+
+  function featureCentroid(feature){
+    var g = feature.geometry;
+    if (!g) return null;
+    var ring = null;
+    if (g.type === "Polygon") ring = g.coordinates[0];
+    else if (g.type === "MultiPolygon") ring = g.coordinates[0][0];
+    else if (g.type === "Point") return { lat:g.coordinates[1], lng:g.coordinates[0] };
+    if (!ring || !ring.length) return null;
+    var lat = 0, lng = 0;
+    ring.forEach(function(pt){ lng += pt[0]; lat += pt[1]; });
+    return { lat: lat / ring.length, lng: lng / ring.length };
+  }
+
+  function fieldVal(props, key){
+    var f = $("fm-" + key).value;
+    return f && props[f] != null ? props[f] : "";
+  }
+
+  function passesFilters(props){
+    var min = nnum($("q-min")), max = nnum($("q-max"));
+    var acres = parseFloat(fieldVal(props, "acres"));
+    if (isFinite(acres)){
+      if (min > 0 && acres < min) return false;
+      if (max > 0 && acres > max) return false;
+    }
+    if ($("q-vacant").checked && $("fm-imp").value){
+      var imp = parseFloat(fieldVal(props, "imp"));
+      if (isFinite(imp) && imp > 0) return false;
+    }
+    return true;
+  }
+
+  function showResults(features, note){
+    if (!map || !parcelLayer){ setStatus("Map didn't load — can't plot results.", "err"); return; }
+    parcelLayer.clearLayers();
+    FINDER.results = [];
+    features.forEach(function(f){
+      if (!passesFilters(f.properties || {})) return;
+      var c = featureCentroid(f);
+      if (!c) return;
+      var idx = FINDER.results.length;
+      var p = f.properties || {};
+      var rec = {
+        idx: idx, lat: c.lat, lng: c.lng,
+        pin: String(fieldVal(p, "pin") || ""), owner: String(fieldVal(p, "owner") || ""),
+        mail: String(fieldVal(p, "mail") || ""), situs: String(fieldVal(p, "situs") || ""),
+        acres: fieldVal(p, "acres"), imp: fieldVal(p, "imp")
+      };
+      FINDER.results.push(rec);
+      var popup = "<strong>" + esc(rec.pin || "no PIN") + "</strong><br>"
+        + esc(rec.owner) + (rec.mail ? "<br>" + esc(rec.mail) : "")
+        + "<br>" + (rec.acres !== "" ? esc(rec.acres) + " ac" : "") + (rec.imp !== "" ? " · impr. $" + esc(rec.imp) : "")
+        + "<br><a href='https://www.google.com/maps?q=" + c.lat + "," + c.lng + "' target='_blank' rel='noopener'>Google Maps</a>"
+        + " · <button data-fadd='" + idx + "' style='padding:3px 8px;font-size:11px'>→ Pipeline</button>";
+      if (f.geometry && f.geometry.type !== "Point"){
+        L.geoJSON(f, { style:{ color:"#1d4ed8", weight:2, fillOpacity:.12 } }).bindPopup(popup).addTo(parcelLayer);
+      }
+      L.circleMarker([c.lat, c.lng], { radius:5, color:"#1d4ed8", fillColor:"#1d4ed8", fillOpacity:.9, weight:1 })
+        .bindPopup(popup).addTo(parcelLayer);
+    });
+    renderResultTable();
+    setStatus(FINDER.results.length + " parcels plotted" + (note ? " — " + note : "") + ".", FINDER.results.length ? "ok" : "err");
+  }
+
+  function renderResultTable(){
+    var body = $("results-body");
+    body.innerHTML = FINDER.results.map(function(r){
+      return "<tr>"
+        + "<td><input type='checkbox' class='res-check' data-idx='" + r.idx + "' style='width:auto'></td>"
+        + "<td><strong>" + esc(r.pin || "—") + "</strong>" + (r.situs ? "<br><span style='color:var(--muted)'>" + esc(r.situs) + "</span>" : "") + "</td>"
+        + "<td>" + esc(r.owner || "—") + "</td>"
+        + "<td>" + esc(r.mail || "—") + "</td>"
+        + "<td>" + (r.acres !== "" ? esc(r.acres) : "—") + "</td>"
+        + "<td>" + (r.imp !== "" ? esc(r.imp) : "—") + "</td>"
+        + "<td><a href='https://www.google.com/maps?q=" + r.lat + "," + r.lng + "' target='_blank' rel='noopener'>view</a></td>"
+        + "</tr>";
+    }).join("");
+    $("results-count").textContent = FINDER.results.length;
+    $("results-wrap").style.display = FINDER.results.length ? "block" : "none";
+    $("sel-all").checked = false;
+  }
+
+  $("btn-search").addEventListener("click", function(){
+    if (!FINDER.layerUrl){ setStatus("Connect to the parcel service first.", "err"); return; }
+    if (!map){ setStatus("Map didn't load — can't search by view.", "err"); return; }
+    var b = map.getBounds();
+    var geometry = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].join(",");
+    var where = "1=1";
+    var acF = $("fm-acres").value, impF = $("fm-imp").value;
+    var min = nnum($("q-min")), max = nnum($("q-max"));
+    if (acF){
+      if (min > 0) where += " AND " + acF + " >= " + min;
+      if (max > 0) where += " AND " + acF + " <= " + max;
+    }
+    if ($("q-vacant").checked && impF) where += " AND (" + impF + " IS NULL OR " + impF + " <= 0)";
+    var base = FINDER.layerUrl + "/query?where=" + encodeURIComponent(where)
+      + "&geometry=" + encodeURIComponent(geometry)
+      + "&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects"
+      + "&outFields=*&returnGeometry=true&outSR=4326&resultRecordCount=800";
+    setStatus("Searching this view…");
+    fetchJson(base + "&f=geojson").then(function(j){
+      if (!j.features) throw new Error("no features in response");
+      showResults(j.features, j.exceededTransferLimit ? "hit the 800 cap, zoom in for full coverage" : "");
+    }).catch(function(){
+      // Older ArcGIS servers don't speak GeoJSON — fall back to Esri JSON.
+      fetchJson(base + "&f=json").then(function(j){
+        var feats = (j.features || []).map(function(f){
+          return { type:"Feature", properties:f.attributes || {}, geometry: esriRingsToGeoJSON(f.geometry) };
+        }).filter(function(f){ return f.geometry; });
+        showResults(feats, j.exceededTransferLimit ? "hit the 800 cap, zoom in for full coverage" : "");
+      }).catch(function(e){
+        setStatus("Search failed (" + e.message + "). If this keeps happening, use the GeoJSON download route.", "err");
+      });
+    });
+  });
+
+  /* GeoJSON file fallback (download from the county GIS Hub) */
+  $("btn-geojson").addEventListener("click", function(){ $("geojson-file").click(); });
+  $("geojson-file").addEventListener("change", function(){
+    var file = this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var j;
+      try { j = JSON.parse(String(reader.result)); }
+      catch(_){ setStatus("That file isn't valid JSON.", "err"); return; }
+      var feats = j.type === "FeatureCollection" ? j.features : j.type === "Feature" ? [j] : null;
+      if (!feats || !feats.length){ setStatus("No features found in that file.", "err"); return; }
+      if (!FINDER.fields.length){
+        var names = Object.keys(feats[0].properties || {});
+        populateFieldSelects(names.map(function(n){ return { name:n }; }));
+      }
+      showResults(feats, "from file, filters applied");
+      if (map && FINDER.results.length){
+        var pts = FINDER.results.map(function(r){ return [r.lat, r.lng]; });
+        map.fitBounds(L.latLngBounds(pts).pad(0.15));
+      }
+    };
+    reader.readAsText(file);
+    this.value = "";
+  });
+
+  $("btn-clear-results").addEventListener("click", function(){
+    if (parcelLayer) parcelLayer.clearLayers();
+    FINDER.results = [];
+    renderResultTable();
+    setStatus(FINDER.layerUrl ? "Results cleared — connected and ready." : "Results cleared.");
+  });
+
+  $("sel-all").addEventListener("change", function(){
+    var on = this.checked;
+    document.querySelectorAll(".res-check").forEach(function(c){ c.checked = on; });
+  });
+
+  function pipelineFromResult(r){
+    var acres = parseFloat(r.acres);
+    return {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      pin: r.pin, loc: r.situs || (r.lat.toFixed(5) + ", " + r.lng.toFixed(5)),
+      market: "Other (in target)",
+      type: isFinite(acres) && acres < 0.75 ? "Spot Lot" : "Road Frontage",
+      acres: r.acres === "" ? "" : String(r.acres), frontage: "", lots: "",
+      ask: "", offer: "",
+      water:false, electric:false, sewer:false, septic:false, paved:false, wet:false, trailer:false,
+      status: "Identified", owner: r.owner, phone: "", mail: r.mail,
+      followup: "", notes: "From Parcel Finder" + (r.imp !== "" ? " · impr. $" + r.imp : ""),
+      updated: Date.now()
+    };
+  }
+
+  function addResultsToPipeline(recs){
+    var added = 0, skipped = 0;
+    recs.forEach(function(r){
+      if (r.pin && parcels.some(function(p){ return p.pin === r.pin; })){ skipped++; return; }
+      parcels.push(pipelineFromResult(r));
+      added++;
+    });
+    persist(); render();
+    setStatus(added + " added to pipeline" + (skipped ? " (" + skipped + " already there)" : "") + ".", "ok");
+  }
+
+  $("btn-add-selected").addEventListener("click", function(){
+    var recs = [];
+    document.querySelectorAll(".res-check:checked").forEach(function(c){
+      var r = FINDER.results[parseInt(c.dataset.idx, 10)];
+      if (r) recs.push(r);
+    });
+    if (!recs.length){ setStatus("Check some parcels first.", "err"); return; }
+    addResultsToPipeline(recs);
+  });
+
+  document.addEventListener("click", function(e){
+    var t = e.target;
+    if (t && t.dataset && t.dataset.fadd != null){
+      var r = FINDER.results[parseInt(t.dataset.fadd, 10)];
+      if (r) addResultsToPipeline([r]);
+    }
+  });
+
+  $("btn-export-calls").addEventListener("click", function(){
+    if (!FINDER.results.length){ setStatus("Nothing to export — run a search first.", "err"); return; }
+    var cols = ["pin","owner","mail","situs","acres","imp","lat","lng","google_maps"];
+    var lines = [cols.join(",")];
+    FINDER.results.forEach(function(r){
+      lines.push([r.pin, r.owner, r.mail, r.situs, r.acres, r.imp, r.lat, r.lng,
+        "https://www.google.com/maps?q=" + r.lat + "," + r.lng].map(csvCell).join(","));
+    });
+    var blob = new Blob([lines.join("\n")], { type:"text/csv" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "baldwin-call-list-" + new Date().toISOString().slice(0,10) + ".csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  window.__bcosInitMap = initMap; /* test hook */
 })();
 </script>
 </body>

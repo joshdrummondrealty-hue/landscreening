@@ -56,7 +56,8 @@ Open Graph and Twitter/X tags in `index.html` point at `https://landscreening.ne
 
 It includes:
 
-- The buy box: spot lots ($75K–$120K/lot, $2K–$7K assignment fees), road-frontage minis (~120 ft/lot on county roads, water + electric at street, septic OK), and small self-developed deals (5–40 ac, ≤25 lots)
+- **Parcel Finder** — live, client-side search of Baldwin County's public parcel service (Revenue Commission / KCS GIS ArcGIS REST). Zoom to an area, filter by acreage and vacant-only (improvement value = 0), and it drops a pin + outline on every match with parcel number, owner, and mailing address, builds a call-list CSV, and pushes keepers into the pipeline. Field names are auto-detected and remappable, so it works against any ArcGIS parcel layer (paste a different layer URL, e.g. from the county GIS Hub). If the live service blocks cross-origin requests, download the parcels layer as GeoJSON from the hub and use "Load GeoJSON file" — same result.
+- The buy box: spot lots ($75K–$120K/lot, $2K–$7K assignment fees), road-frontage minis (lot width ~120 ft measured at the front building line — not the pavement; water + electric at street, septic OK), and small self-developed deals (5–40 ac, ≤25 lots)
 - Kill screens (Bay Minette school zone, trailer areas, wetlands, price benchmark $18–25K/ac)
 - A parcel pipeline tracker with automatic 0–100 Deal Score ranking, saved in `localStorage`, with CSV import/export
 - Spot-lot wholesale calculator (builder 25% margin check) and road-frontage yield calculator
