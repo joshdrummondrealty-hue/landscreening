@@ -1,0 +1,28 @@
+# Parcel finder and land sourcing tools (belong in private repo)
+baldwin/
+/baldwin/
+
+# API keys and secrets
+.env
+.env.local
+.env.*.local
+
+# Sensitive data files
+*.csv
+*.json
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Node modules (if ever used)
+node_modules/
