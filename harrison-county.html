@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Harrison County Frontage Finder — Drummond Land Co</title>
+<meta name="description" content="Sourcing package for road-frontage, already-zoned lots in Harrison County, MS. Zoning tiers, target corridors, verified leads, county GIS query recipes, and a due-diligence kit." />
+<link rel="icon" href="favicon.svg" />
+<style>
+:root{
+  --paper:#eef1ec; --surface:#f7f9f5; --surface-2:#e6ebe2;
+  --ink:#17241f; --ink-soft:#40514a; --ink-faint:#6d7d74;
+  --line:#cfd6cd; --line-strong:#b7c1b5;
+  --primary:#2f5d4f; --primary-strong:#23473c; --primary-tint:#dbe7df;
+  --accent:#b45f24; --accent-tint:#f0dccb;
+  --ready:#2f7d5c; --ready-bg:#d8ece0;
+  --cond:#9a7112; --cond-bg:#f0e6c8;
+  --not:#a8452c; --not-bg:#f1d9d1;
+  --shadow:0 1px 2px rgba(23,36,31,.06),0 8px 24px -12px rgba(23,36,31,.18);
+  --mono:ui-monospace,"SF Mono","Cascadia Code","Roboto Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --maxw:1120px;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0f1613; --surface:#161f1a; --surface-2:#1e2a24;
+    --ink:#e7ece6; --ink-soft:#aebbb3; --ink-faint:#7d8c83;
+    --line:#2a3730; --line-strong:#3a4a41;
+    --primary:#57a488; --primary-strong:#6cbb9d; --primary-tint:#1b2a23;
+    --accent:#dd9159; --accent-tint:#33241a;
+    --ready:#5cbf94; --ready-bg:#173026;
+    --cond:#d3aa4a; --cond-bg:#302713;
+    --not:#e07a5f; --not-bg:#331d17;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="light"]{
+  --paper:#eef1ec; --surface:#f7f9f5; --surface-2:#e6ebe2;
+  --ink:#17241f; --ink-soft:#40514a; --ink-faint:#6d7d74;
+  --line:#cfd6cd; --line-strong:#b7c1b5;
+  --primary:#2f5d4f; --primary-strong:#23473c; --primary-tint:#dbe7df;
+  --accent:#b45f24; --accent-tint:#f0dccb;
+  --ready:#2f7d5c; --ready-bg:#d8ece0; --cond:#9a7112; --cond-bg:#f0e6c8;
+  --not:#a8452c; --not-bg:#f1d9d1;
+}
+:root[data-theme="dark"]{
+  --paper:#0f1613; --surface:#161f1a; --surface-2:#1e2a24;
+  --ink:#e7ece6; --ink-soft:#aebbb3; --ink-faint:#7d8c83;
+  --line:#2a3730; --line-strong:#3a4a41;
+  --primary:#57a488; --primary-strong:#6cbb9d; --primary-tint:#1b2a23;
+  --accent:#dd9159; --accent-tint:#33241a;
+  --ready:#5cbf94; --ready-bg:#173026; --cond:#d3aa4a; --cond-bg:#302713;
+  --not:#e07a5f; --not-bg:#331d17;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+  line-height:1.55;font-size:16px;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:44px 44px;background-position:-1px -1px;
+}
+@media (prefers-color-scheme:dark){body{background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px)}}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.02em;line-height:1.1}
+.mono{font-family:var(--mono)}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--primary);font-weight:600}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---- top bar ---- */
+header.bar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar-in{display:flex;align-items:center;gap:14px;padding:11px 20px;max-width:var(--maxw);margin:0 auto}
+.brandmark{width:26px;height:26px;flex:none}
+.bar b{font-size:.95rem;letter-spacing:-.01em}
+.bar .sep{color:var(--ink-faint)}
+.bar small{color:var(--ink-faint);font-family:var(--mono);font-size:.72rem}
+.bar .push{margin-left:auto}
+.themebtn{font-family:var(--mono);font-size:.72rem;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 9px;cursor:pointer}
+.themebtn:hover{border-color:var(--line-strong)}
+
+/* ---- hero ---- */
+.hero{padding:52px 0 28px;position:relative}
+.hero .eyebrow{margin-bottom:14px;display:block}
+.hero h1{font-size:clamp(2rem,5.4vw,3.4rem);font-weight:800}
+.hero .lede{margin-top:16px;max-width:60ch;color:var(--ink-soft);font-size:1.08rem}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.chip{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:.76rem;padding:6px 11px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-soft)}
+.chip b{color:var(--ink);font-weight:600}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--ready)}
+.notice{margin-top:26px;display:flex;gap:12px;align-items:flex-start;background:var(--accent-tint);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:10px;padding:13px 15px;font-size:.9rem;color:var(--ink)}
+.notice svg{flex:none;margin-top:2px}
+
+/* ---- section scaffold ---- */
+section{padding:34px 0;border-top:1px solid var(--line)}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+.sec-head .idx{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600;padding-top:4px}
+.sec-head h2{font-size:clamp(1.3rem,3vw,1.7rem);font-weight:750}
+.sec-head p{margin:2px 0 0;color:var(--ink-soft);font-size:.95rem;flex-basis:100%;max-width:70ch}
+
+/* ---- KPI grid ---- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 16px;box-shadow:var(--shadow)}
+.kpi .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
+.kpi .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.72rem;font-weight:700;margin-top:8px;line-height:1;color:var(--ink)}
+.kpi .s{font-size:.8rem;color:var(--ink-soft);margin-top:7px}
+.kpi.hi{border-color:color-mix(in srgb,var(--primary) 45%,var(--line));background:var(--primary-tint)}
+
+/* ---- zoning tiers ---- */
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.tier{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;box-shadow:var(--shadow)}
+.tier .top{padding:13px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+.tier .tag{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;padding:3px 9px;border-radius:999px}
+.tier.ready .tag{background:var(--ready-bg);color:var(--ready)}
+.tier.cond .tag{background:var(--cond-bg);color:var(--cond)}
+.tier.not .tag{background:var(--not-bg);color:var(--not)}
+.tier .top h3{font-size:.98rem;font-weight:700}
+.tier ul{margin:0;padding:12px 16px 6px;list-style:none;display:flex;flex-direction:column;gap:9px}
+.tier li{display:flex;gap:10px;font-size:.9rem;align-items:baseline}
+.tier li code{font-family:var(--mono);font-size:.78rem;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--ink);flex:none;min-width:44px;text-align:center}
+.tier .foot{padding:10px 16px 15px;font-size:.82rem;color:var(--ink-faint)}
+
+/* ---- corridors ---- */
+.corridors{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.corr{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:14px 15px}
+.corr h4{margin:0;font-size:.95rem;font-weight:700;display:flex;align-items:center;gap:8px}
+.corr h4 .rd{font-family:var(--mono);font-size:.68rem;background:var(--ink);color:var(--paper);padding:2px 6px;border-radius:4px;font-weight:700}
+.corr p{margin:8px 0 0;font-size:.85rem;color:var(--ink-soft)}
+.corr .z{margin-top:10px;font-family:var(--mono);font-size:.72rem;color:var(--primary)}
+
+/* ---- leads ---- */
+.filterbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
+.filterbar .lbl{font-family:var(--mono);font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-faint);margin-right:4px}
+.fbtn{font-family:var(--mono);font-size:.76rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-soft);cursor:pointer}
+.fbtn[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:#fff}
+:root[data-theme="dark"] .fbtn[aria-pressed="true"],@media (prefers-color-scheme:dark){.fbtn[aria-pressed="true"]{color:#0f1613}}
+.leads{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.lead{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+.lead .lh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.lead h3{font-size:1.02rem;font-weight:700}
+.lead .corr-lbl{font-family:var(--mono);font-size:.72rem;color:var(--ink-faint);margin-top:3px}
+.zpill{font-family:var(--mono);font-size:.68rem;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;flex:none}
+.zpill.ready{background:var(--ready-bg);color:var(--ready)} .zpill.cond{background:var(--cond-bg);color:var(--cond)} .zpill.unk{background:var(--surface-2);color:var(--ink-faint)}
+.specs{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;border-top:1px dashed var(--line-strong);border-bottom:1px dashed var(--line-strong);padding:12px 0}
+.spec .sk{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint)}
+.spec .sv{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.98rem;font-weight:600;margin-top:2px}
+.lead .lf{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.78rem}
+.verify{font-family:var(--mono);font-size:.68rem;color:var(--cond);display:inline-flex;gap:5px;align-items:center}
+.hidden{display:none!important}
+
+/* ---- code / query ---- */
+.recipe{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.recipe .rh{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.recipe .rh h4{margin:0;font-size:.92rem;font-weight:700}
+.recipe .rh p{margin:0;flex-basis:100%;font-size:.82rem;color:var(--ink-soft)}
+.copy{margin-left:auto;font-family:var(--mono);font-size:.7rem;padding:4px 10px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface-2);color:var(--ink-soft);cursor:pointer}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+pre{margin:0;padding:14px;overflow-x:auto;background:var(--surface-2);font-family:var(--mono);font-size:.78rem;line-height:1.6;color:var(--ink)}
+pre .cm{color:var(--ink-faint)}
+
+/* ---- calc ---- */
+.calc{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.calc .fields{display:flex;flex-direction:column;gap:13px}
+.field label{display:block;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:5px}
+.field input{width:100%;font-family:var(--mono);font-size:1rem;padding:9px 11px;border:1px solid var(--line-strong);border-radius:8px;background:var(--paper);color:var(--ink)}
+.field input:focus{outline:none;border-color:var(--primary)}
+.out{background:var(--primary-tint);border:1px solid color-mix(in srgb,var(--primary) 40%,var(--line));border-radius:12px;padding:18px;display:flex;flex-direction:column;justify-content:center;gap:14px}
+.out .big{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:2.7rem;font-weight:800;line-height:1;color:var(--primary-strong)}
+:root[data-theme="dark"] .out .big{color:var(--primary-strong)}
+.out .biglbl{font-size:.85rem;color:var(--ink-soft);margin-top:-6px}
+.out .row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.85rem;border-top:1px solid var(--line);padding-top:9px}
+.out .row span:last-child{font-weight:700}
+
+/* ---- checklist ---- */
+.dd{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.ddcol{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+.ddcol h4{margin:0 0 11px;font-size:.9rem;font-weight:700;display:flex;align-items:center;gap:8px}
+.ddcol h4 .n{font-family:var(--mono);font-size:.7rem;color:var(--paper);background:var(--primary);width:20px;height:20px;border-radius:5px;display:grid;place-items:center;flex:none}
+.ck{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+.ck li{display:flex;gap:9px;font-size:.87rem;align-items:flex-start;color:var(--ink-soft)}
+.ck li::before{content:"";width:15px;height:15px;border:1.5px solid var(--line-strong);border-radius:4px;flex:none;margin-top:3px}
+.flag{display:inline-block;font-family:var(--mono);font-size:.62rem;font-weight:700;color:var(--not);background:var(--not-bg);padding:1px 6px;border-radius:4px;margin-left:6px}
+
+/* ---- steps ---- */
+.steps{counter-reset:s;display:flex;flex-direction:column;gap:0}
+.step{display:grid;grid-template-columns:auto 1fr;gap:16px;padding:16px 0;border-top:1px solid var(--line)}
+.step:first-child{border-top:none}
+.step .sn{counter-increment:s;font-family:var(--mono);font-weight:700;color:var(--primary);font-size:.9rem;width:34px;height:34px;border:1px solid var(--primary);border-radius:50%;display:grid;place-items:center}
+.step .sn::before{content:counter(s)}
+.step h4{margin:0 0 5px;font-size:1rem;font-weight:700}
+.step p{margin:0;color:var(--ink-soft);font-size:.9rem}
+.loi{margin-top:12px;background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:12px 14px;font-size:.85rem;font-style:italic;color:var(--ink-soft)}
+
+/* ---- footer ---- */
+footer{border-top:1px solid var(--line);padding:30px 0 60px;margin-top:10px}
+.srclist{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 24px;font-size:.82rem;margin:14px 0 24px}
+.srclist a{font-family:var(--mono);font-size:.76rem}
+.disclaimer{font-size:.78rem;color:var(--ink-faint);max-width:78ch;line-height:1.6}
+.copyright{margin-top:20px;font-family:var(--mono);font-size:.72rem;color:var(--ink-faint)}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:.8rem;padding:9px 16px;border-radius:8px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (max-width:640px){.calc{grid-template-columns:1fr}.specs{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-in">
+    <svg class="brandmark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="6" fill="var(--primary)"/><path d="M8 22 L14 10 L18 18 L21 13 L24 22 Z" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/><circle cx="14" cy="10" r="1.6" fill="var(--accent)"/></svg>
+    <b>Drummond Land Co</b><span class="sep">·</span><small>FRONTAGE FINDER</small>
+    <span class="push"></span>
+    <small class="num">Harrison County, MS</small>
+    <button class="themebtn" id="themeToggle" type="button" aria-label="Toggle color theme">◐ Theme</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <span class="eyebrow">Deal Sourcing Package · Gulf Coast MS · Data as of Jul 13 2026</span>
+    <h1>Road-frontage lots in Harrison County that are already zoned.</h1>
+    <p class="lede">A working screen — not a plat. It maps which Harrison County zoning districts are development-ready, where frontage and zoning overlap on the ground, the live leads worth a call, and the exact county-GIS queries to pull the full parcel set yourself.</p>
+    <div class="chips">
+      <span class="chip"><span class="dot"></span><b>Already zoned</b> — commercial / mixed-use districts</span>
+      <span class="chip"><span class="dot" style="background:var(--accent)"></span><b>Road frontage</b> — state highway &amp; arterial</span>
+      <span class="chip"><span class="dot" style="background:var(--cond)"></span><b>Screened</b>, not verified — confirm at source</span>
+    </div>
+    <div class="notice">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      <span><b>Read this first.</b> Every parcel, price, and zoning tag below is a screening signal pulled from public listings and the county GIS — a starting point for underwriting, not a confirmed fact. Verify current zoning, flood zone, wetlands, and access at the county before you make an offer. Nothing here is legal, survey, or investment advice.</span>
+    </div>
+  </div>
+
+  <!-- MARKET -->
+  <section id="market">
+    <div class="sec-head">
+      <span class="idx">01</span>
+      <h2>The market you're buying into</h2>
+      <p>Public listing-aggregator snapshot for Harrison County commercial land, July 2026. Use it to sanity-check any asking price against the county mean.</p>
+    </div>
+    <div class="kpis">
+      <div class="kpi hi"><div class="k">Commercial listings</div><div class="v">103</div><div class="s">active countywide (Land.com / LandSearch)</div></div>
+      <div class="kpi"><div class="k">Avg list price</div><div class="v">$1.20M</div><div class="s">mean commercial parcel</div></div>
+      <div class="kpi"><div class="k">Avg $ / acre</div><div class="v">$67.3k</div><div class="s">countywide commercial</div></div>
+      <div class="kpi"><div class="k">Inventory</div><div class="v">~1,000ac</div><div class="s">≈ $64M commercial land listed</div></div>
+      <div class="kpi"><div class="k">Median size</div><div class="v">~6ac</div><div class="s">typical commercial tract</div></div>
+    </div>
+    <div class="kpis" style="margin-top:12px">
+      <div class="kpi"><div class="k">D'Iberville submkt · listings</div><div class="v">62</div><div class="s">I-10 / I-110 growth node</div></div>
+      <div class="kpi"><div class="k">D'Iberville · avg price</div><div class="v">$699k</div><div class="s">smaller, higher-turnover pads</div></div>
+      <div class="kpi"><div class="k">D'Iberville · $ / acre</div><div class="v">$476k</div><div class="s">7× county mean — interchange premium</div></div>
+    </div>
+  </section>
+
+  <!-- ZONING TIERS -->
+  <section id="zoning">
+    <div class="sec-head">
+      <span class="idx">02</span>
+      <h2>What "already zoned" actually means here</h2>
+      <p>Harrison County runs a Unified Development Code plus a SmartCode (transect) overlay along key corridors. Districts sort into three buckets for a frontage-commercial play. Confirm the current code — the county amends it periodically.</p>
+    </div>
+    <div class="tiers">
+      <div class="tier ready">
+        <div class="top"><span class="tag">Ready</span><h3>Buy &amp; build — by right</h3></div>
+        <ul>
+          <li><code>C-2</code>General Commercial — highway retail, pads, services</li>
+          <li><code>C-1</code>Neighborhood / limited commercial</li>
+          <li><code>B-2</code>Business — arterial commercial nodes</li>
+          <li><code>T5 / T6</code>SmartCode urban-center &amp; core transects</li>
+        </ul>
+        <div class="foot">Frontage retail/commercial is a permitted use — no rezone needed. Best fit for your screen.</div>
+      </div>
+      <div class="tier cond">
+        <div class="top"><span class="tag">Conditional</span><h3>Zoned, but needs a step</h3></div>
+        <ul>
+          <li><code>C-3</code>Highway/heavy commercial — some uses conditional</li>
+          <li><code>T4</code>General urban transect — use-specific approvals</li>
+          <li><code>M-1</code>Light industrial — if the play is flex/warehouse</li>
+          <li><code>PUD</code>Planned unit dev — site-plan review</li>
+        </ul>
+        <div class="foot">Zoned for commercial-ish use but expect a conditional-use permit or site-plan hearing. Price the delay in.</div>
+      </div>
+      <div class="tier not">
+        <div class="top"><span class="tag">Not ready</span><h3>Would need a rezone</h3></div>
+        <ul>
+          <li><code>A-1</code>General Agriculture (15ac+ intent)</li>
+          <li><code>R-1</code>Single-family residential</li>
+          <li><code>R-2</code>Low-density residential</li>
+          <li><code>E-1</code>Estate / rural residential</li>
+        </ul>
+        <div class="foot">Cheap frontage often sits here. Viable only if you'll carry a rezone — longer, political, no guarantee.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CORRIDORS -->
+  <section id="corridors">
+    <div class="sec-head">
+      <span class="idx">03</span>
+      <h2>Where frontage and commercial zoning overlap</h2>
+      <p>The corridors to farm first — each carries traffic count and existing commercial zoning, so frontage parcels here are the highest-probability "already-zoned" hits.</p>
+    </div>
+    <div class="corridors">
+      <div class="corr"><h4><span class="rd">US-49</span> Gulfport ↔ north county</h4><p>The county's commercial spine. Continuous C-2/B-2 frontage from Airport Rd north through Lyman toward Saucier.</p><div class="z">Zoned: C-2 · B-2 · SmartCode nodes</div></div>
+      <div class="corr"><h4><span class="rd">I-10</span> interchanges</h4><p>Menge Ave, Canal Rd, Lorraine-Gorenflo, Hwy 49 &amp; the D'Iberville exits — interchange commercial, highest $/ac.</p><div class="z">Zoned: C-2 · C-3 · PUD</div></div>
+      <div class="corr"><h4><span class="rd">Popp's Ferry Rd</span> Biloxi corridor</h4><p>20k+ vehicles/day; retail &amp; pad frontage, some water-adjacent tracts near Atkinson Rd / Biloxi Bay.</p><div class="z">Zoned: C-1 · C-2 (Biloxi city fringe)</div></div>
+      <div class="corr"><h4><span class="rd">Dedeaux Rd</span> · Three Rivers Rd</h4><p>Gulfport growth arc feeding I-10; B-2 nodes at major intersections, residential between.</p><div class="z">Zoned: B-2 nodes · R-1 fill</div></div>
+      <div class="corr"><h4><span class="rd">Hwy 67</span> Woolmarket ↔ Saucier</h4><p>Emerging corridor; more A-1/E-1 = rezone plays, but cheaper entries with real frontage.</p><div class="z">Zoned: A-1 · E-1 (rezone upside)</div></div>
+      <div class="corr"><h4><span class="rd">Cowan-Lorraine</span> · Menge Ave</h4><p>North-south connectors linking I-10 to the beach cities; mixed commercial pockets.</p><div class="z">Zoned: C-2 pockets · R-1</div></div>
+    </div>
+  </section>
+
+  <!-- LEADS -->
+  <section id="leads">
+    <div class="sec-head">
+      <span class="idx">04</span>
+      <h2>Live leads worth a call</h2>
+      <p>Signals that surfaced in public listing aggregators for frontage tracts. Filter by readiness. These are leads to <b>verify at source</b>, not confirmed inventory — no price is asserted as fact.</p>
+    </div>
+    <div class="filterbar" role="group" aria-label="Filter leads by zoning readiness">
+      <span class="lbl">Filter</span>
+      <button class="fbtn" data-f="all" aria-pressed="true" type="button">All</button>
+      <button class="fbtn" data-f="ready" aria-pressed="false" type="button">Ready-zoned</button>
+      <button class="fbtn" data-f="cond" aria-pressed="false" type="button">Conditional</button>
+      <button class="fbtn" data-f="unk" aria-pressed="false" type="button">Zoning TBD</button>
+    </div>
+    <div class="leads" id="leadGrid">
+      <!-- lead -->
+      <article class="lead" data-tier="ready">
+        <div class="lh"><div><h3>I-10 West Exit pad</h3><div class="corr-lbl">D'Iberville · I-10 interchange</div></div><span class="zpill ready">C-2</span></div>
+        <div class="specs">
+          <div class="spec"><div class="sk">Acreage</div><div class="sv">Verify</div></div>
+          <div class="spec"><div class="sk">Frontage</div><div class="sv">High-vis</div></div>
+          <div class="spec"><div class="sk">Zoning</div><div class="sv">C-2 comm'l</div></div>
+          <div class="spec"><div class="sk">Traffic</div><div class="sv">Interchange</div></div>
+        </div>
+        <div class="lf"><span class="verify">◆ Verify at source</span><a href="https://www.landsearch.com/commercial/diberville-ms" target="_blank" rel="noopener">D'Iberville listings ↗</a></div>
+      </article>
+      <!-- lead -->
+      <article class="lead" data-tier="cond">
+        <div class="lh"><div><h3>Popp's Ferry — pad tract</h3><div class="corr-lbl">Biloxi fringe · Popp's Ferry Rd</div></div><span class="zpill cond">C-1?</span></div>
+        <div class="specs">
+          <div class="spec"><div class="sk">Acreage</div><div class="sv">3.6 ac</div></div>
+          <div class="spec"><div class="sk">Frontage</div><div class="sv">565 ft</div></div>
+          <div class="spec"><div class="sk">Traffic</div><div class="sv">20k+ VPD</div></div>
+          <div class="spec"><div class="sk">Zoning</div><div class="sv">Confirm</div></div>
+        </div>
+        <div class="lf"><span class="verify">◆ Verify at source</span><a href="https://www.landsearch.com/commercial/harrison-county-ms" target="_blank" rel="noopener">Harrison commercial ↗</a></div>
+      </article>
+      <!-- lead -->
+      <article class="lead" data-tier="cond">
+        <div class="lh"><div><h3>Popp's Ferry / Atkinson</h3><div class="corr-lbl">Biloxi Bay · water-adjacent</div></div><span class="zpill cond">C-1?</span></div>
+        <div class="specs">
+          <div class="spec"><div class="sk">Acreage</div><div class="sv">6.4 ac</div></div>
+          <div class="spec"><div class="sk">Frontage</div><div class="sv">725 ft*</div></div>
+          <div class="spec"><div class="sk">Traffic</div><div class="sv">10k+ VPD</div></div>
+          <div class="spec"><div class="sk">Note</div><div class="sv">Water*</div></div>
+        </div>
+        <div class="lf"><span class="verify">◆ 725 ft on Atkinson Rd · flood?</span><a href="https://www.land.com/Harrison-County-MS/commercial-property/" target="_blank" rel="noopener">Land.com ↗</a></div>
+      </article>
+      <!-- lead -->
+      <article class="lead" data-tier="unk">
+        <div class="lh"><div><h3>Biloxi Bay 40-acre</h3><div class="corr-lbl">Popp's Ferry ↔ Atkinson Rd</div></div><span class="zpill unk">TBD</span></div>
+        <div class="specs">
+          <div class="spec"><div class="sk">Acreage</div><div class="sv">40 ac</div></div>
+          <div class="spec"><div class="sk">Frontage</div><div class="sv">Dual-road</div></div>
+          <div class="spec"><div class="sk">Water</div><div class="sv">Biloxi Bay</div></div>
+          <div class="spec"><div class="sk">Zoning</div><div class="sv">Confirm</div></div>
+        </div>
+        <div class="lf"><span class="verify">◆ Large-tract · rezone/PUD path</span><a href="https://www.land.com/Harrison-County-MS/commercial-property/" target="_blank" rel="noopener">Land.com ↗</a></div>
+      </article>
+      <!-- lead -->
+      <article class="lead" data-tier="unk">
+        <div class="lh"><div><h3>Hwy 49 South tract</h3><div class="corr-lbl">US-49 · commercial spine</div></div><span class="zpill unk">TBD</span></div>
+        <div class="specs">
+          <div class="spec"><div class="sk">Acreage</div><div class="sv">13.5 ac</div></div>
+          <div class="spec"><div class="sk">Frontage</div><div class="sv">Hwy 49</div></div>
+          <div class="spec"><div class="sk">Access</div><div class="sv">Existing dwy</div></div>
+          <div class="spec"><div class="sk">Zoning</div><div class="sv">Confirm</div></div>
+        </div>
+        <div class="lf"><span class="verify">◆ Existing driveway = curb-cut done</span><a href="https://www.landwatch.com/mississippi-land-for-sale/harrison-county" target="_blank" rel="noopener">LandWatch ↗</a></div>
+      </article>
+      <!-- lead -->
+      <article class="lead" data-tier="ready">
+        <div class="lh"><div><h3>Dedeaux / Three Rivers</h3><div class="corr-lbl">Gulfport growth arc</div></div><span class="zpill ready">B-2</span></div>
+        <div class="specs">
+          <div class="spec"><div class="sk">Acreage</div><div class="sv">Verify</div></div>
+          <div class="spec"><div class="sk">Frontage</div><div class="sv">Corner</div></div>
+          <div class="spec"><div class="sk">Zoning</div><div class="sv">B-2 comm'l</div></div>
+          <div class="spec"><div class="sk">Access</div><div class="sv">Intersection</div></div>
+        </div>
+        <div class="lf"><span class="verify">◆ Verify at source</span><a href="https://www.landandfarm.com/search/mississippi/harrison-county/commercial-land-for-sale/" target="_blank" rel="noopener">Land And Farm ↗</a></div>
+      </article>
+      <!-- lead -->
+      <article class="lead" data-tier="unk">
+        <div class="lh"><div><h3>9.3-ac paved frontage</h3><div class="corr-lbl">North county · borders gov't forest</div></div><span class="zpill unk">A-1?</span></div>
+        <div class="specs">
+          <div class="spec"><div class="sk">Acreage</div><div class="sv">9.3 ac</div></div>
+          <div class="spec"><div class="sk">Frontage</div><div class="sv">Paved rd</div></div>
+          <div class="spec"><div class="sk">Restrict.</div><div class="sv">None listed</div></div>
+          <div class="spec"><div class="sk">Zoning</div><div class="sv">Likely A-1</div></div>
+        </div>
+        <div class="lf"><span class="verify">◆ Rezone play — cheaper entry</span><a href="https://www.acretown.com/property/harrison/" target="_blank" rel="noopener">AcreTown ↗</a></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- QUERY RECIPES -->
+  <section id="queries">
+    <div class="sec-head">
+      <span class="idx">05</span>
+      <h2>Pull the full set yourself — county GIS query recipes</h2>
+      <p>Harrison County publishes an authoritative zoning map service. These are copy-paste queries to pull every commercially-zoned parcel, then intersect with roads for frontage. Run them from a browser or QGIS; the endpoints require no login.</p>
+    </div>
+
+    <div class="recipe">
+      <div class="rh"><h4>1 · All ready-zoned parcels (C-1/C-2/B-2)</h4><button class="copy" type="button">Copy</button><p>ArcGIS REST query against the county zoning layer. Adjust the field name (<code class="mono">ZONE</code>/<code class="mono">ZONING</code>) to match the layer schema.</p></div>
+<pre><code><span class="cm"># Harrison County zoning MapServer — Zoning Districts layer</span>
+https://geo.co.harrison.ms.us/server/rest/services/District/Zoning/MapServer/1/query
+  ?where=ZONE IN ('C-1','C-2','B-2')
+  &outFields=*
+  &returnGeometry=true
+  &f=geojson</code></pre>
+    </div>
+
+    <div class="recipe">
+      <div class="rh"><h4>2 · Inspect the schema first</h4><button class="copy" type="button">Copy</button><p>Confirm the real zoning field name + coded values before querying. Open this and read <code class="mono">fields[]</code> and any <code class="mono">domain</code>.</p></div>
+<pre><code>https://geo.co.harrison.ms.us/server/rest/services/District/Zoning/MapServer/1?f=json
+
+<span class="cm"># Alt (AGO-hosted feature service):</span>
+https://geo.co.harrison.ms.us/server/rest/services/AGO/HarrisonCounty_Zoning/FeatureServer/0?f=json</code></pre>
+    </div>
+
+    <div class="recipe">
+      <div class="rh"><h4>3 · Frontage filter — parcels touching a highway</h4><button class="copy" type="button">Copy</button><p>Spatial intersect in QGIS: load zoning + the MS DOT / county road centerlines, buffer roads ~15&nbsp;m, select zoned parcels whose boundary intersects the buffer. That set = zoned <em>and</em> road-frontage.</p></div>
+<pre><code><span class="cm"># QGIS Processing recipe</span>
+1. Add layer  → zoning MapServer/1  (filter: ZONE IN ('C-1','C-2','B-2'))
+2. Add layer  → road centerlines (county GIS / MS DOT)
+3. Buffer     → roads, 15 m, dissolve
+4. Extract by location → zoned parcels that INTERSECT road buffer
+5. Field calc → frontage_ft = length of shared boundary * 3.281
+6. Filter     → frontage_ft &gt; 150  (drop flag-lots / slivers)</code></pre>
+    </div>
+
+    <div class="recipe">
+      <div class="rh"><h4>4 · Saved aggregator searches (owner + asking price)</h4><button class="copy" type="button">Copy</button><p>The GIS gives you zoning + frontage; these give you what's for sale + who to call. Bookmark and check weekly.</p></div>
+<pre><code>Land.com   commercial → https://www.land.com/Harrison-County-MS/commercial-property/
+LandSearch commercial → https://www.landsearch.com/commercial/harrison-county-ms
+LandWatch  all land   → https://www.landwatch.com/mississippi-land-for-sale/harrison-county
+County parcel/tax map → https://harrisoncountyms.gov/goverment/tax_assessor/online_mapping.php
+Zoning ordinance (UDC)→ https://harrisoncountyms.gov/departments/zoning/downloads.php</code></pre>
+    </div>
+  </section>
+
+  <!-- CALC -->
+  <section id="screen">
+    <div class="sec-head">
+      <span class="idx">06</span>
+      <h2>Screen a lead in 10 seconds — Land Trace Pro yield</h2>
+      <p>Drop a candidate's numbers in to see buildable lots and land-cost-per-lot before you spend a phone call on it. Same math as the <a href="index.html">Lot Yield Calculator</a>.</p>
+    </div>
+    <div class="calc">
+      <div class="fields">
+        <div class="field"><label for="ac">Gross acreage</label><input id="ac" type="number" value="13.5" min="0" step="0.1" inputmode="decimal" /></div>
+        <div class="field"><label for="wet">Wetlands / unbuildable %</label><input id="wet" type="number" value="15" min="0" max="100" step="1" inputmode="numeric" /></div>
+        <div class="field"><label for="inf">Roads &amp; infrastructure %</label><input id="inf" type="number" value="25" min="0" max="100" step="1" inputmode="numeric" /></div>
+        <div class="field"><label for="lot">Avg lot size (ac)</label><input id="lot" type="number" value="0.5" min="0.05" step="0.05" inputmode="decimal" /></div>
+        <div class="field"><label for="ask">Asking price ($, optional)</label><input id="ask" type="number" value="675000" min="0" step="1000" inputmode="numeric" /></div>
+      </div>
+      <div class="out">
+        <div><div class="big num" id="lots">—</div><div class="biglbl">estimated buildable lots</div></div>
+        <div class="row"><span>Net developable</span><span class="num" id="net">—</span></div>
+        <div class="row"><span>Lots / gross acre</span><span class="num" id="dens">—</span></div>
+        <div class="row"><span>Raw land $ / lot</span><span class="num" id="ppl">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DUE DILIGENCE -->
+  <section id="dd">
+    <div class="sec-head">
+      <span class="idx">07</span>
+      <h2>Due-diligence kit — Gulf Coast edition</h2>
+      <p>Before earnest money goes hard. On the coast, flood zone and wetlands make or break the yield you just calculated — check them first.</p>
+    </div>
+    <div class="dd">
+      <div class="ddcol"><h4><span class="n">A</span>Flood &amp; elevation</h4><ul class="ck">
+        <li>Pull the FEMA flood zone — AE / VE coastal zones drive fill, BFE &amp; insurance <span class="flag">deal-killer</span></li>
+        <li>Base Flood Elevation vs. site grade → fill cost per lot</li>
+        <li>Check post-Katrina advisory / V-zone velocity limits</li>
+      </ul></div>
+      <div class="ddcol"><h4><span class="n">B</span>Wetlands &amp; environment</h4><ul class="ck">
+        <li>USACE / NWI wetlands overlay — feeds your "unbuildable %" <span class="flag">yield hit</span></li>
+        <li>Order a jurisdictional determination if any doubt</li>
+        <li>Phase I ESA if prior commercial/ag use</li>
+      </ul></div>
+      <div class="ddcol"><h4><span class="n">C</span>Access &amp; frontage</h4><ul class="ck">
+        <li>Curb-cut / access permit — MS DOT for US-49 &amp; I-10, county for local roads</li>
+        <li>Confirm legal frontage vs. easement-only access</li>
+        <li>Turn-lane / deceleration requirements at high VPD</li>
+      </ul></div>
+      <div class="ddcol"><h4><span class="n">D</span>Zoning &amp; entitlements</h4><ul class="ck">
+        <li>Written zoning verification letter from the county</li>
+        <li>Setbacks, buffers, height &amp; parking ratios for the district</li>
+        <li>Any SmartCode transect overlay conditions</li>
+      </ul></div>
+      <div class="ddcol"><h4><span class="n">E</span>Utilities</h4><ul class="ck">
+        <li>Sewer vs. septic — Harrison County Utility Authority availability</li>
+        <li>Water &amp; fire-flow at the frontage</li>
+        <li>Power / gas capacity; distance to tie-in</li>
+      </ul></div>
+      <div class="ddcol"><h4><span class="n">F</span>Title &amp; survey</h4><ul class="ck">
+        <li>Title commitment — easements, ROW, mineral rights</li>
+        <li>Boundary + topo survey; confirm acreage vs. tax roll</li>
+        <li>Existing liens / back taxes on the parcel</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <!-- OUTREACH -->
+  <section id="outreach">
+    <div class="sec-head">
+      <span class="idx">08</span>
+      <h2>From lead to contract</h2>
+      <p>The repeatable workflow once a parcel clears the screen above.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="sn"></div><div><h4>Identify the owner of record</h4><p>Pull the parcel from the county tax-assessor online map → owner name + mailing address + last sale. Cross-check acreage against the listing.</p></div></div>
+      <div class="step"><div class="sn"></div><div><h4>Skip-trace &amp; qualify</h4><p>Phone/email for the owner (or the LLC's registered agent via MS Secretary of State). Note whether it's listed with an agent or a for-sale-by-owner you can approach directly.</p></div></div>
+      <div class="step"><div class="sn"></div><div><h4>Send the opener</h4><p>Short, specific, non-lowball. Reference the parcel by frontage and zoning so they know you've done homework.<div class="loi">"I'm a local land buyer focused on the US-49 / I-10 corridor. I'm interested in your ~13.5-acre frontage parcel on Hwy 49 South. If you'd consider a clean cash offer with a short due-diligence window, I'd like to send a letter of intent this week — what number would get your attention?"</div></p></div></div>
+      <div class="step"><div class="sn"></div><div><h4>LOI → contract with contingencies</h4><p>Non-binding LOI first, then a purchase agreement with feasibility contingencies covering every item in the DD kit — zoning verification, flood/wetlands, access permit, and utilities — before earnest money goes hard.</p></div></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="eyebrow">Sources &amp; data provenance</span>
+    <div class="srclist">
+      <a href="https://geo.co.harrison.ms.us/server/rest/services/District/Zoning/MapServer/1" target="_blank" rel="noopener">Harrison County Zoning MapServer</a>
+      <a href="https://harrisoncountyms.gov/departments/zoning/downloads.php" target="_blank" rel="noopener">Harrison County UDC / zoning ordinance</a>
+      <a href="https://harrisoncountyms.gov/goverment/tax_assessor/online_mapping.php" target="_blank" rel="noopener">County tax-assessor parcel map</a>
+      <a href="https://opendata.gis.ms.gov/maps/cf6a7471368b4a89b8ddfc25fb2a391f" target="_blank" rel="noopener">MS Geospatial Catalog — zoning</a>
+      <a href="https://www.landsearch.com/commercial/harrison-county-ms" target="_blank" rel="noopener">LandSearch — commercial</a>
+      <a href="https://www.land.com/Harrison-County-MS/commercial-property/" target="_blank" rel="noopener">Land.com — commercial</a>
+      <a href="https://www.landwatch.com/mississippi-land-for-sale/harrison-county" target="_blank" rel="noopener">LandWatch — Harrison County</a>
+      <a href="https://www.landandfarm.com/search/mississippi/harrison-county/commercial-land-for-sale/" target="_blank" rel="noopener">Land And Farm — commercial</a>
+    </div>
+    <p class="disclaimer"><b>Disclaimer.</b> This package is a screening aid compiled from public listing aggregators and public county GIS on July 13, 2026. Acreage, frontage, traffic counts, and zoning tags are unverified signals — market conditions and zoning change, and listings sell. Nothing here is legal, engineering, survey, appraisal, brokerage, or investment advice, and no parcel price is represented as fact. Independently verify current zoning, flood zone, wetlands, access, utilities, and title with the appropriate authority before acting. Yield figures are planning-level estimates, not engineered site plans.</p>
+    <div class="copyright">© Drummond Land Co · Harrison County Frontage Finder · built on the Land Trace Pro screening stack</div>
+  </div>
+</footer>
+
+<div class="toast" id="toast">Copied</div>
+
+<script>
+(function(){
+  "use strict";
+  // ---- theme toggle ----
+  var root=document.documentElement, tb=document.getElementById('themeToggle');
+  function cur(){var a=root.getAttribute('data-theme');if(a)return a;return window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}
+  tb.addEventListener('click',function(){root.setAttribute('data-theme',cur()==='dark'?'light':'dark');});
+
+  // ---- lead filter ----
+  var fbtns=document.querySelectorAll('.fbtn'), leads=document.querySelectorAll('#leadGrid .lead');
+  fbtns.forEach(function(b){b.addEventListener('click',function(){
+    fbtns.forEach(function(x){x.setAttribute('aria-pressed','false');});
+    b.setAttribute('aria-pressed','true');
+    var f=b.getAttribute('data-f');
+    leads.forEach(function(l){l.classList.toggle('hidden', f!=='all' && l.getAttribute('data-tier')!==f);});
+  });});
+
+  // ---- copy buttons ----
+  var toast=document.getElementById('toast'), tt;
+  function ping(msg){toast.textContent=msg||'Copied';toast.classList.add('show');clearTimeout(tt);tt=setTimeout(function(){toast.classList.remove('show');},1400);}
+  document.querySelectorAll('.copy').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var pre=btn.closest('.recipe').querySelector('pre');
+      var txt=pre.innerText.replace(/ /g,' ');
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){ping('Copied to clipboard');},function(){ping('Press Ctrl/Cmd+C');});}
+      else{ping('Press Ctrl/Cmd+C');}
+    });
+  });
+
+  // ---- yield calculator (Land Trace Pro math) ----
+  var ids=['ac','wet','inf','lot','ask'], el={};
+  ids.forEach(function(i){el[i]=document.getElementById(i);});
+  var fLots=document.getElementById('lots'),fNet=document.getElementById('net'),fDens=document.getElementById('dens'),fPpl=document.getElementById('ppl');
+  function n(x){var v=parseFloat(x);return isFinite(v)?v:0;}
+  function fmt(v){return v.toLocaleString('en-US',{maximumFractionDigits:0});}
+  function calc(){
+    var ac=n(el.ac.value), wet=Math.min(100,n(el.wet.value)), inf=Math.min(100,n(el.inf.value)), lot=n(el.lot.value), ask=n(el.ask.value);
+    var afterWet=ac*(1-wet/100);
+    var net=afterWet*(1-inf/100);
+    var lots=lot>0?Math.floor(net/lot):0;
+    fNet.textContent=net>0?net.toFixed(1)+' ac':'—';
+    fDens.textContent=ac>0?(lots/ac).toFixed(2):'—';
+    fLots.textContent=lots>0?lots:'0';
+    fPpl.textContent=(ask>0&&lots>0)?'$'+fmt(ask/lots):'—';
+  }
+  ids.forEach(function(i){el[i].addEventListener('input',calc);});
+  calc();
+})();
+</script>
+</body>
+</html>
